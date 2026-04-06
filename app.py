@@ -12,13 +12,25 @@ st.set_page_config(page_title="IDS", layout="wide")
 
 @st.cache_resource
 def load_assets():
-    # CAMBIO CLAVE: Se carga sin compilar para evitar errores de versión en la nube
+    # --- PARCHE DE COMPATIBILIDAD KERAS 2/3 ---
+    from tensorflow.keras.layers import InputLayer
+    
+    class CustomInputLayer(InputLayer):
+        def __init__(self, *args, **kwargs):
+            # Si detecta 'batch_shape' (formato viejo), lo convierte a 'shape' (formato nuevo)
+            if 'batch_shape' in kwargs:
+                kwargs['shape'] = kwargs.pop('batch_shape')[1:]
+            super().__init__(*args, **kwargs)
+
+    custom_objects = {'InputLayer': CustomInputLayer}
+    # --- FIN DEL PARCHE ---
+
     try:
-        m = tf.keras.models.load_model("modelo_cnn.h5", compile=False)
-        # Lo compilamos aquí mismo para que esté listo para predecir
+        # Cargamos usando los objetos personalizados y sin compilar
+        m = tf.keras.models.load_model("modelo_cnn.h5", custom_objects=custom_objects, compile=False)
         m.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     except Exception as e:
-        st.error(f"Error al cargar el modelo: {e}")
+        st.error(f"Error técnico de compatibilidad: {e}")
         st.stop()
         
     s = joblib.load("scaler.pkl")
@@ -38,12 +50,10 @@ model, scaler, features_list = load_assets()
 archivo = st.file_uploader("Cargar tráfico de red", type=["csv"])
 
 if archivo:
-    # Ajustado a 5000 para que el análisis sea más completo
     df_raw = pd.read_csv(archivo, nrows=5000)
     df_raw.columns = df_raw.columns.str.strip()
 
     if st.button("Iniciar Monitoreo"):
-        # Preprocesamiento
         df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
         X_input = df_clean[features_list]
         X_scaled = scaler.transform(X_input)
@@ -74,8 +84,6 @@ if archivo:
             grafico_cnt = st.empty()
 
         historial_completo = []
-        
-        # Ajustado a 5000 también aquí
         max_demo_rows = min(5000, total_registros)
         progreso = st.progress(0)
 
@@ -83,9 +91,7 @@ if archivo:
             fila_completa = df_clean.iloc[i].copy()
             entrada_modelo = X_scaled[i:i + 1]
 
-            # Predicción
             probabilidad = model.predict(entrada_modelo, verbose=0)[0][0]
-            # Umbral de detección ajustado
             prediccion_binaria = 1 if probabilidad > 0.5 else 0
             preds_acumuladas.append(prediccion_binaria)
 
@@ -110,7 +116,6 @@ if archivo:
             }
 
             historial_completo.insert(0, datos_simplificados)
-            # Mostrar solo los últimos 50 en la tabla para que no se ponga lento
             tabla_flujos.dataframe(pd.DataFrame(historial_completo[:50]), use_container_width=True)
 
             if (i + 1) % 25 == 0 or i == max_demo_rows - 1:
@@ -124,7 +129,6 @@ if archivo:
                 plt.close(fig)
 
             progreso.progress((i + 1) / max_demo_rows)
-            # Un poquito de delay para que se vea el efecto en vivo
             time.sleep(0.005)
 
         st.success("Análisis completo.")
