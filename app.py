@@ -13,39 +13,40 @@ st.set_page_config(page_title="IDS - Dashboard de Tesis", layout="wide")
 @st.cache_resource
 def load_assets():
     try:
-        # Definimos la arquitectura manual (78 columnas de entrada)
-        # Esto permite cargar los pesos (.h5) sin errores de compatibilidad
+        # ARQUITECTURA AJUSTADA (4 capas detectadas en el archivo)
         m = tf.keras.Sequential([
             tf.keras.layers.Input(shape=(78, 1)),
             tf.keras.layers.Conv1D(64, 3, activation='relu', padding='same'),
-            tf.keras.layers.MaxPooling1D(2),
+            tf.keras.layers.Conv1D(32, 3, activation='relu', padding='same'), # Capa extra para cuadrar
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dense(1, activation='sigmoid')
         ])
         
-        # Cargamos solo los pesos del archivo .h5
-        if os.path.exists("modelo_cnn.h5"):
+        # Intentamos cargar los pesos. Si falla el conteo, usamos el cargador automático
+        # que ahora debería funcionar porque ya tienes Python 3.11 y TF 2.15
+        try:
             m.load_weights("modelo_cnn.h5")
+            m.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        except:
+            # Plan B: Carga directa (Ahora que el entorno es compatible)
+            m = tf.keras.models.load_model("modelo_cnn.h5", compile=False)
+            m.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
         
-        m.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-        
-        # Carga de transformadores (Asegúrate que estos nombres sean idénticos en GitHub)
         s = joblib.load("scaler.pkl")
         f = joblib.load("features.pkl")
         return m, s, f
     except Exception as e:
-        st.error(f"Error crítico al montar el modelo: {e}")
+        st.error(f"Error al montar el modelo: {e}")
         st.stop()
 
 # --- INTERFAZ ---
 st.title("🛡️ Monitor de Sistema de Detección de Intrusos")
 st.subheader("Análisis de Tráfico de Red con Inteligencia Artificial (CNN)")
 
-# Verificación de archivos en el repositorio
-archivos_ok = all(os.path.exists(x) for x in ["modelo_cnn.h5", "scaler.pkl", "features.pkl"])
-if not archivos_ok:
-    st.error("⚠️ Faltan archivos en GitHub: Verifica que modelo_cnn.h5, scaler.pkl y features.pkl estén subidos.")
+# Verificación de archivos
+if not all(os.path.exists(x) for x in ["modelo_cnn.h5", "scaler.pkl", "features.pkl"]):
+    st.error("⚠️ Faltan archivos en GitHub: Sube modelo_cnn.h5, scaler.pkl y features.pkl.")
     st.stop()
 
 model, scaler, features_list = load_assets()
@@ -53,11 +54,11 @@ model, scaler, features_list = load_assets()
 archivo = st.file_uploader("📂 Cargar dataset de tráfico (CSV)", type=["csv"])
 
 if archivo:
-    df_raw = pd.read_csv(archivo, nrows=5000) # Leemos 5000 filas para la demo
+    df_raw = pd.read_csv(archivo, nrows=5000)
     df_raw.columns = df_raw.columns.str.strip()
 
     if st.button("🚀 Iniciar Monitoreo"):
-        # Preprocesamiento
+        # Preprocesamiento rápido
         df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
         X_input = df_clean[features_list]
         X_scaled = scaler.transform(X_input)
@@ -97,16 +98,11 @@ if archivo:
                 res = "🚨 ATAQUE"
                 conf = prob * 100
 
-            # Actualizar métricas visuales
             m1.metric("Total Analizado", i + 1)
             m2.metric("Seguro", reg_normal)
             m3.metric("Ataques", reg_ataque, delta=f"+{reg_ataque}" if reg_ataque > 0 else 0)
 
-            historial.insert(0, {
-                "ID": i + 1,
-                "Resultado": res,
-                "Confianza": f"{conf:.2f}%"
-            })
+            historial.insert(0, {"ID": i + 1, "Resultado": res, "Confianza": f"{conf:.2f}%"})
             tabla.dataframe(pd.DataFrame(historial[:10]), use_container_width=True)
 
             if (i + 1) % 50 == 0 or i == len(X_scaled) - 1:
