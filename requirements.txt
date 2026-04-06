@@ -1,7 +1,7 @@
-streamlit
+streamlit==1.32.0
 pandas
-numpy
-tensorflow-cpu
+numpy<2.0.0
+tensorflow-cpu==2.15.0
 joblib
 scikit-learn
 imbalanced-learn
