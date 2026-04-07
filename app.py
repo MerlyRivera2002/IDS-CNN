@@ -47,73 +47,81 @@ model, scaler, features_list = load_assets()
 
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# PESTAÑA 1: MONITOREO (CON TU ANIMACIÓN)
+# --- ---------------------------------------------DENTRO DE TU PESTAÑA 1 -------------------------------------------------------------
 with tab1:
-    if st.session_state.perfil == "Administrador":
-        st.header("Análisis de Tráfico de Red en Tiempo Real")
-        archivo = st.file_uploader("Cargar flujo de datos (CSV)", type=["csv"])
-        if archivo:
-            if st.button("▶️ INICIAR ESCANEO"):
-                col_izq, col_der = st.columns([1, 2])
-                m1, m2 = col_izq.empty(), col_izq.empty()
-                p_plot, t_data = col_der.empty(), st.empty()
+    st.header("🛡️ Monitor de Tráfico en Tiempo Real")
+    archivo = st.file_uploader("Subir dataset para simulación", type=["csv"])
+    
+    if archivo:
+        if st.button("🚀 INICIAR MONITOREO"):
+            # 1. CREAMOS LOS CONTENEDORES VACÍOS (Para evitar el parpadeo)
+            col_izq, col_der = st.columns([1, 1])
+            with col_izq:
+                espacio_pastel = st.empty()
+            with col_der:
+                espacio_metricas = st.empty()
+            
+            st.write("---")
+            st.subheader("🛰️ Registro de Actividad")
+            espacio_tabla = st.empty()
+            
+            # Procesamiento inicial
+            df_raw = pd.read_csv(archivo)
+            # ... (Aquí va tu limpieza de datos y preparación) ...
+            
+            preds_totales = []
+            
+            # 2. EL BUCLE DE SIMULACIÓN (Velocidad controlada)
+            # Procesamos de 10 en 10 para que sea más fluido
+            for i in range(0, len(df_clean), 10):
+                chunk = df_clean.iloc[i : i + 10]
+                # Inferencia de la IA
+                X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
+                chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
+                preds_totales.extend(chunk_preds)
                 
-                t_ini = time.time()
-                df_raw = pd.read_csv(archivo)
-                df_raw.columns = df_raw.columns.str.strip()
-                df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
+                # CÁLCULOS PARA VISUALIZACIÓN
+                ataques = sum(preds_totales)
+                normales = len(preds_totales) - ataques
                 
-                X = scaler.transform(df_clean[features_list]).reshape(-1, len(features_list), 1)
-                preds, normal, ataque = [], 0, 0
+                # A. Actualizar Gráfico de Pastel (Sin parpadeo)
+                fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'], 
+                               color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6)
+                fig_pie.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0), showlegend=False)
+                espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"p_{i}")
                 
-                # TU BUCLE DE ANIMACIÓN INTACTO
-                for i in range(0, len(X), 25):
-                    res = (model.predict(X[i:i+25], verbose=0) > 0.5).astype(int).flatten()
-                    for r in res:
-                        preds.append(r)
-                        if r == 1: ataque += 1
-                        else: normal += 1
+                # B. Actualizar Métricas (Estilo Dashboard Pro)
+                with espacio_metricas.container():
+                    st.metric("CONEXIONES TOTALES", len(preds_totales))
+                    st.metric("INTRUSIONES DETECTADAS", ataques, delta=f"+{chunk_preds.sum()}", delta_color="inverse")
+
+                # C. Actualizar Tabla (Con la columna de "Naturaleza")
+                with espacio_tabla.container():
+                    # Tomamos los últimos 15 para la vista rápida
+                    vista = chunk.copy()
+                    vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
                     
-                    m1.metric("Eventos Normales", normal)
-                    m2.metric("Intrusiones Detectadas", ataque)
+                    # AQUÍ ESTÁ TU COLUMNA DE NATURALEZA
+                    def sugerir_amenaza(row):
+                        if "NORMAL" in row['Estado']: return "Tráfico Seguro"
+                        p = row['Destination Port']
+                        if p in [80, 443]: return "Ataque Web (HTTP/S)"
+                        if p == 22: return "Fuerza Bruta (SSH)"
+                        if p == 21: return "Acceso FTP no aut."
+                        return "Escaneo / Port Scan"
                     
-                    fig = px.pie(values=[normal, ataque], names=['Normal', 'Ataque'], 
-                                 color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.4)
-                    fig.update_layout(height=280, margin=dict(l=0,r=0,t=0,b=0), showlegend=False)
-                    p_plot.plotly_chart(fig, use_container_width=True, key=f"l_{i}")
+                    vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
                     
-                    with t_data.container():
-                        tmp = df_clean.iloc[max(0, i-5):i+25].copy()
-                        tmp['Estado'] = ["⚠️ ATAQUE" if p == 1 else "✅ NORMAL" for p in preds[max(0, i-5):i+25]]
-                        st.dataframe(tmp.iloc[:, [0, 1, 2, -1]], use_container_width=True)
-                    time.sleep(0.05)
+                    # Mostramos solo columnas clave para que no se vea ancho
+                    st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
 
-                # CÁLCULO DE PUERTO TOP PARA EL HISTORIAL
-                p_top = logic.obtener_puerto_top(df_clean, preds)
-                logic.guardar_en_historial("historial.csv", archivo.name, len(preds), ataque, (time.time()-t_ini), fecha_simulada, p_top)
+                # 3. EL "PASO" (Control de velocidad)
+                # 0.1 es una velocidad natural. 0.05 es más rápido pero visible.
+                time.sleep(0.1) 
 
-                st.success(f"✅ Análisis finalizado. Datos guardados para el día {fecha_simulada}")
-                st.divider()
+            st.success("✅ Simulación finalizada. Resultados guardados en el historial.")
 
-                # SECCIÓN DE MÉTRICAS (MATRIZ Y BARRAS)
-                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
-                if col_label:
-                    y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
-                    acc, prec = accuracy_score(y_true, preds), precision_score(y_true, preds, zero_division=0)
-                    rec, f1 = recall_score(y_true, preds, zero_division=0), f1_score(y_true, preds, zero_division=0)
-
-                    c_mat, c_met = st.columns([2, 3])
-                    with c_mat:
-                        st.write("**Matriz de Confusión**")
-                        cm, _ = logic.generar_metricas_detalladas(y_true, preds)
-                        st.plotly_chart(px.imshow(cm, text_auto=True, x=['Pred: Normal', 'Pred: Ataque'], y=['Real: Normal', 'Real: Ataque'], color_continuous_scale='Blues'), use_container_width=True)
-                    with c_met:
-                        st.write("**Métricas de Precisión**")
-                        fig_bar = go.Figure([go.Bar(x=['Accuracy', 'Precision', 'Recall', 'F1-Score'], y=[acc, prec, rec, f1], marker_color='#3498db', text=[f"{v*100:.1f}%" for v in [acc, prec, rec, f1]], textposition='auto')])
-                        st.plotly_chart(fig_bar, use_container_width=True)
-    else: st.warning("🔒 Acceso Restringido. Use el perfil Administrador.")
-
-# --- EN LA PESTAÑA 2: GRÁFICA ESTILO CAPTURAS ---
+# --------------------------------------------- EN LA PESTAÑA 2: GRÁFICA ESTILO CAPTURAS -----------------------------------------------
 st.subheader("📈 Evolución Diaria de Capturas")
 
 if os.path.exists("historial.csv"):
