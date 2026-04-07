@@ -81,7 +81,7 @@ with tab1:
                     
                     with t_data.container():
                         tmp = df_clean.iloc[max(0, i-5):i+25].copy()
-                        tmp['Estado'] = ["⚠️ ANOMALÍA" if p == 1 else "✅ NORMAL" for p in preds[max(0, i-5):i+25]]
+                        tmp['Estado'] = ["⚠️ ATAQUE" if p == 1 else "✅ NORMAL" for p in preds[max(0, i-5):i+25]]
                         st.dataframe(tmp.iloc[:, [0, 1, 2, -1]], use_container_width=True)
                     time.sleep(0.1)
 
