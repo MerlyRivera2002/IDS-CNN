@@ -1,95 +1,140 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import tensorflow as tf
 import joblib
-from tensorflow.keras.models import load_model
-import logic
 import os
 import time
 import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import logic 
 
-# Configuración de página
-st.set_page_config(page_title="IDS Tesis 2026", layout="wide")
-st.title("🛡️ Sistema de Monitoreo de Red - Tesis 2026")
+st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# Cargar IA
+# --- LOGIN (TU CÓDIGO INTACTO) ---
+if 'perfil' not in st.session_state: st.session_state.perfil = None
+
+st.sidebar.title("🔐 Control de Acceso")
+if st.session_state.perfil is None:
+    u = st.sidebar.text_input("Usuario")
+    p = st.sidebar.text_input("Clave", type="password")
+    if st.sidebar.button("Ingresar"):
+        if u == "admin" and p == "tesis2026": 
+            st.session_state.perfil = "Administrador"
+            st.rerun()
+        elif u == "viewer" and p == "visita2026":
+            st.session_state.perfil = "Visualizador"
+            st.rerun()
+        else: st.sidebar.error("Credenciales incorrectas")
+    st.stop()
+else:
+    st.sidebar.success(f"Conectado como: {st.session_state.perfil}")
+    # --- NUEVO: SELECTOR DE FECHA PARA TESIS ---
+    st.sidebar.divider()
+    st.sidebar.subheader("📅 Simulación de Tiempo")
+    fecha_simulada = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
+    
+    if st.sidebar.button("Cerrar Sesión"):
+        st.session_state.clear(); st.rerun()
+
+# Carga de archivos
 @st.cache_resource
-def cargar_recursos():
-    modelo = load_model('modelo_cnn.keras')
-    scaler = joblib.load('scaler.pkl')
-    features = joblib.load('features.pkl')
-    return modelo, scaler, features
+def load_assets():
+    return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
 
-model, scaler, features_list = cargar_recursos()
+model, scaler, features_list = load_assets()
 
-# --- SIDEBAR: CALENDARIO DE SIMULACIÓN ---
-st.sidebar.header("📅 Simulación Temporal")
-fecha_sel = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
-st.sidebar.info("Cambia la fecha para simular el comportamiento de diferentes días de Abril.")
+tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-tab1, tab2 = st.tabs(["🔍 Detección Actual", "📈 Historial y Tendencias"])
-
-# --- PESTAÑA 1: ESCANEO ---
+# PESTAÑA 1: MONITOREO (CON TU ANIMACIÓN)
 with tab1:
-    archivo = st.file_uploader("Subir tráfico de red (CSV)", type=["csv"])
-    
-    if archivo:
-        df = pd.read_csv(archivo)
-        
-        if st.button("🔴 Iniciar Análisis Crítico"):
-            with st.spinner("Analizando patrones de ataque..."):
+    if st.session_state.perfil == "Administrador":
+        st.header("Análisis de Tráfico de Red en Tiempo Real")
+        archivo = st.file_uploader("Cargar flujo de datos (CSV)", type=["csv"])
+        if archivo:
+            if st.button("▶️ INICIAR ESCANEO"):
+                col_izq, col_der = st.columns([1, 2])
+                m1, m2 = col_izq.empty(), col_izq.empty()
+                p_plot, t_data = col_der.empty(), st.empty()
+                
                 t_ini = time.time()
+                df_raw = pd.read_csv(archivo)
+                df_raw.columns = df_raw.columns.str.strip()
+                df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
                 
-                # Procesar datos
-                df_input = df[features_list]
-                df_scaled = scaler.transform(df_input)
+                X = scaler.transform(df_clean[features_list]).reshape(-1, len(features_list), 1)
+                preds, normal, ataque = [], 0, 0
                 
-                # Predicción
-                preds_prob = model.predict(df_scaled)
-                preds = (preds_prob > 0.5).astype(int).flatten()
-                
-                num_ataques = int(preds.sum())
-                t_fin = time.time() - t_ini
-                
-                # Detectar puerto más afectado
-                p_critico = logic.obtener_puerto_critico(df, preds)
-                
-                # Guardar datos
-                logic.guardar_en_historial("data_history.csv", archivo.name, len(df), num_ataques, t_fin, fecha_sel, p_critico)
-                
-                # Métricas visuales
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Alertas de Ataque", num_ataques)
-                c2.metric("Puerto en Riesgo", p_critico)
-                c3.metric("Tiempo de Respuesta", f"{round(t_fin, 2)}s")
-                
-                st.success(f"Datos registrados para el día: {fecha_sel}")
+                # TU BUCLE DE ANIMACIÓN INTACTO
+                for i in range(0, len(X), 25):
+                    res = (model.predict(X[i:i+25], verbose=0) > 0.5).astype(int).flatten()
+                    for r in res:
+                        preds.append(r)
+                        if r == 1: ataque += 1
+                        else: normal += 1
+                    
+                    m1.metric("Eventos Normales", normal)
+                    m2.metric("Intrusiones Detectadas", ataque)
+                    
+                    fig = px.pie(values=[normal, ataque], names=['Normal', 'Ataque'], 
+                                 color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.4)
+                    fig.update_layout(height=280, margin=dict(l=0,r=0,t=0,b=0), showlegend=False)
+                    p_plot.plotly_chart(fig, use_container_width=True, key=f"l_{i}")
+                    
+                    with t_data.container():
+                        tmp = df_clean.iloc[max(0, i-5):i+25].copy()
+                        tmp['Estado'] = ["⚠️ ATAQUE" if p == 1 else "✅ NORMAL" for p in preds[max(0, i-5):i+25]]
+                        st.dataframe(tmp.iloc[:, [0, 1, 2, -1]], use_container_width=True)
+                    time.sleep(0.05)
 
-# --- PESTAÑA 2: TENDENCIAS (CAPÍTULO 4) ---
+                # CÁLCULO DE PUERTO TOP PARA EL HISTORIAL
+                p_top = logic.obtener_puerto_top(df_clean, preds)
+                logic.guardar_en_historial("historial.csv", archivo.name, len(preds), ataque, (time.time()-t_ini), fecha_simulada, p_top)
+
+                st.success(f"✅ Análisis finalizado. Datos guardados para el día {fecha_simulada}")
+                st.divider()
+
+                # SECCIÓN DE MÉTRICAS (MATRIZ Y BARRAS)
+                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+                if col_label:
+                    y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
+                    acc, prec = accuracy_score(y_true, preds), precision_score(y_true, preds, zero_division=0)
+                    rec, f1 = recall_score(y_true, preds, zero_division=0), f1_score(y_true, preds, zero_division=0)
+
+                    c_mat, c_met = st.columns([2, 3])
+                    with c_mat:
+                        st.write("**Matriz de Confusión**")
+                        cm, _ = logic.generar_metricas_detalladas(y_true, preds)
+                        st.plotly_chart(px.imshow(cm, text_auto=True, x=['Pred: Normal', 'Pred: Ataque'], y=['Real: Normal', 'Real: Ataque'], color_continuous_scale='Blues'), use_container_width=True)
+                    with c_met:
+                        st.write("**Métricas de Precisión**")
+                        fig_bar = go.Figure([go.Bar(x=['Accuracy', 'Precision', 'Recall', 'F1-Score'], y=[acc, prec, rec, f1], marker_color='#3498db', text=[f"{v*100:.1f}%" for v in [acc, prec, rec, f1]], textposition='auto')])
+                        st.plotly_chart(fig_bar, use_container_width=True)
+    else: st.warning("🔒 Acceso Restringido. Use el perfil Administrador.")
+
+# PESTAÑA 2: REPORTES Y TENDENCIA DE PUNTOS
 with tab2:
-    st.header("📊 Análisis Evolutivo de Seguridad")
-    
-    hist_file = "data_history.csv"
-    if os.path.exists(hist_file) and os.path.getsize(hist_file) > 0:
-        df_h = pd.read_csv(hist_file)
-        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
-        df_h = df_h.sort_values("Fecha") # Ordenar cronológicamente
+    st.header("📊 Historial de Auditoría y Comportamiento")
+    if os.path.exists("historial.csv"):
+        df_h = pd.read_csv("historial.csv")
+        df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
+        df_h = df_h.sort_values('Fecha_Dt')
         
-        # Gráfica de Líneas con Puntos (Scatter + Line)
-        fig = px.line(df_h, x="Fecha", y="Ataques", markers=True,
-                     title="Tendencia de Incidentes por Día",
-                     labels={"Ataques": "Cantidad de Ataques", "Fecha": "Línea de Tiempo"})
-        
-        # Personalización de estilo
-        fig.update_traces(line_color='#FF4B4B', marker=dict(size=12, symbol='diamond'))
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Tabla detallada
-        st.subheader("📋 Auditoría de Datos")
-        st.dataframe(df_h, use_container_width=True)
-        
-        # Botón de descarga para el análisis final
-        csv_data = df_h.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Descargar Datos para Capítulo 4", data=csv_data, file_name="auditoria_abril.csv")
-        
+        # 1. GRÁFICA DE LÍNEAS CON PUNTOS (Petición del Profe)
+        st.subheader("📈 Tendencia de Seguridad Diaria (Series de Tiempo)")
+        fig_dots = px.line(df_h, x='Fecha_Dt', y='Ataques_Detectados', markers=True,
+                          title="Evolución de Ataques Detectados",
+                          labels={'Ataques_Detectados': 'Incidentes', 'Fecha_Dt': 'Línea de Tiempo'},
+                          color_discrete_sequence=['#e74c3c'])
+        fig_dots.update_traces(marker=dict(size=10, symbol='diamond'))
+        st.plotly_chart(fig_dots, use_container_width=True)
+
+        st.divider()
+
+        # 2. TABLAS DETALLADAS (TU ESTRUCTURA ORIGINAL)
+        for dia, grupo in df_h.groupby('Fecha'):
+            with st.expander(f"📅 JORNADA: {dia}", expanded=True):
+                st.table(grupo[['Dataset', 'Registros_Procesados', 'Ataques_Detectados', 'Puerto_Critico', 'Tiempo_Ejecucion_Seg']])
     else:
-        st.warning("No hay datos registrados aún. Realiza un escaneo para empezar a graficar.")
+        st.info("ℹ️ No hay registros históricos.")
