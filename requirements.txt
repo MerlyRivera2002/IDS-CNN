@@ -5,3 +5,4 @@ tensorflow
 joblib
 scikit-learn
 matplotlib
+plotly
