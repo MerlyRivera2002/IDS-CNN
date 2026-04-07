@@ -12,7 +12,7 @@ import logic
 
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- 1. LOGIN EN SIDEBAR ---
+# --- 1. LOGIN EN SIDEBAR (Lateral) ---
 if 'perfil' not in st.session_state: st.session_state.perfil = None
 
 st.sidebar.title("🔐 Control de Acceso")
@@ -45,9 +45,14 @@ with tab1:
     
     if archivo:
         if st.button("▶️ INICIAR ESCANEO"):
-            # Contenedores que se quedan fijos
-            conteo_espacio = st.columns([1, 2])
-            tabla_espacio = st.empty()
+            # --- CREACIÓN DE ESPACIOS FIJOS (Para evitar multiplicaciones) ---
+            col_metricas, col_grafico = st.columns([1, 2])
+            
+            # Objetos 'empty' para que Streamlit sepa que debe REEMPLAZAR, no añadir
+            conteo_1 = col_metricas.empty()
+            conteo_2 = col_metricas.empty()
+            grafico_pie = col_grafico.empty()
+            tabla_flujo = st.empty()
             
             t_ini = time.time()
             df_raw = pd.read_csv(archivo, nrows=1000)
@@ -56,7 +61,7 @@ with tab1:
             X = scaler.transform(df_clean[features_list]).reshape(-1, len(features_list), 1)
             
             preds, normal, ataque = [], 0, 0
-            paso = 25 # Bloques pequeños para mejor visualización
+            paso = 25 
             
             for i in range(0, len(X), paso):
                 res = (model.predict(X[i:i+paso], verbose=0) > 0.5).astype(int).flatten()
@@ -65,58 +70,52 @@ with tab1:
                     if r == 1: ataque += 1
                     else: normal += 1
                 
-                # Actualización del Monitor (No se borra al final)
-                with conteo_espacio[0].container():
-                    st.metric("Normales", normal)
-                    st.metric("Ataques", ataque)
+                # ACTUALIZACIÓN EN EL MISMO SITIO (Sin duplicar)
+                conteo_1.metric("Eventos Normales", normal)
+                conteo_2.metric("Intrusiones Detectadas", ataque)
                 
-                with conteo_espacio[1].container():
-                    fig_pie = px.pie(values=[normal, ataque], names=['Normal', 'Ataque'], 
-                                    color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.4)
-                    fig_pie.update_layout(height=250, margin=dict(l=0, r=0, t=0, b=0))
-                    st.plotly_chart(fig_pie, use_container_width=True, key=f"realtime_pie_{i}")
+                fig = px.pie(values=[normal, ataque], names=['Normal', 'Ataque'], 
+                            color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.4)
+                fig.update_layout(height=280, margin=dict(l=0, r=0, t=0, b=0))
+                grafico_pie.plotly_chart(fig, use_container_width=True, key=f"pie_id_{i}")
 
-                with tabla_espacio.container():
-                    st.write("**Flujo de paquetes procesados:**")
-                    temp_df = df_clean.iloc[max(0, i-10):i+paso].copy()
-                    temp_df['Clasificación'] = ["ANOMALÍA" if p == 1 else "BENIGNO" for p in preds[max(0, i-10):i+paso]]
+                with tabla_flujo.container():
+                    st.write("**Inspección de flujo dinámico:**")
+                    temp_df = df_clean.iloc[max(0, i-5):i+paso].copy()
+                    temp_df['Resultado IA'] = ["⚠️ ANOMALÍA" if p == 1 else "✅ BENIGNO" for p in preds[max(0, i-5):i+paso]]
                     st.dataframe(temp_df.iloc[:, [0, 1, 2, -1]], use_container_width=True)
                 
-                time.sleep(0.3) # Velocidad moderada para defensa de tesis
+                time.sleep(0.4) # Velocidad controlada para defensa
 
-            st.success("✅ Análisis de flujo completo. Resultados consolidados debajo.")
+            st.success("✅ Análisis finalizado. Resultados estadísticos generados debajo.")
 
-            # --- SECCIÓN DE MÉTRICAS (APARECE DEBAJO DE LO ANTERIOR) ---
+            # --- SECCIÓN DE MÉTRICAS (Aparece una sola vez al final) ---
             st.divider()
-            st.header("📈 Evaluación Estadística Final")
+            st.header("📈 Evaluación Estadística del Modelo")
             
             if 'Label' in df_clean.columns:
                 y_real = df_clean['Label'].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x else 1)
-                acc = accuracy_score(y_real, preds)
-                prec = precision_score(y_real, preds, zero_division=0)
-                rec = recall_score(y_real, preds, zero_division=0)
-                f1 = f1_score(y_real, preds, zero_division=0)
+                acc, prec = accuracy_score(y_real, preds), precision_score(y_real, preds, zero_division=0)
+                rec, f1 = recall_score(y_real, preds, zero_division=0), f1_score(y_real, preds, zero_division=0)
                 
                 c1, c2 = st.columns([2, 3])
                 with c1:
-                    st.subheader("Matriz de Confusión")
+                    st.write("**Matriz de Confusión Académica**")
                     cm, _ = logic.generar_metricas_detalladas(y_real, preds)
-                    fig_cm = px.imshow(cm, text_auto=True, x=['IA: Benigno', 'IA: Ataque'], 
-                                      y=['Real: Benigno', 'Real: Ataque'], color_continuous_scale='Blues')
-                    st.plotly_chart(fig_cm, use_container_width=True)
+                    st.plotly_chart(px.imshow(cm, text_auto=True, x=['Pred: Normal', 'Pred: Ataque'], 
+                                             y=['Real: Normal', 'Real: Ataque'], color_continuous_scale='Blues'))
 
                 with c2:
-                    st.subheader("Indicadores Académicos")
-                    nombres = ['Exactitud', 'Precisión', 'Sensibilidad', 'F1-Score']
-                    valores = [acc, prec, rec, f1]
-                    fig_met = go.Figure([go.Bar(x=nombres, y=valores, marker_color='#3498db', text=[f"{v:.4f}" for v in valores], textposition='auto')])
-                    fig_met.update_layout(yaxis=dict(range=[0, 1.1]), height=350)
-                    st.plotly_chart(fig_met, use_container_width=True)
-                    st.table(pd.DataFrame({"Métrica": nombres, "Valor": valores}))
+                    st.write("**Métricas de Rendimiento (Evaluación)**")
+                    met_n = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
+                    met_v = [acc, prec, rec, f1]
+                    fig_bar = go.Figure([go.Bar(x=met_n, y=met_v, marker_color='#3498db', text=[f"{v:.4f}" for v in met_v], textposition='auto')])
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                    st.table(pd.DataFrame({"Métrica": met_n, "Valor": met_v}))
 
             logic.guardar_en_historial("historial.csv", archivo.name, len(preds), ataque, (time.time()-t_ini))
 
 with tab2:
-    st.header("Historial de Auditorías")
+    st.header("Bitácora de Auditoría")
     if os.path.exists("historial.csv"):
         st.dataframe(pd.read_csv("historial.csv"), use_container_width=True)
