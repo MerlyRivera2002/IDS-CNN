@@ -113,28 +113,58 @@ with tab1:
                         st.plotly_chart(fig_bar, use_container_width=True)
     else: st.warning("🔒 Acceso Restringido. Use el perfil Administrador.")
 
-# PESTAÑA 2: REPORTES Y TENDENCIA DE PUNTOS
-with tab2:
-    st.header("📊 Historial de Auditoría y Comportamiento")
-    if os.path.exists("historial.csv"):
-        df_h = pd.read_csv("historial.csv")
-        df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
-        df_h = df_h.sort_values('Fecha_Dt')
-        
-        # 1. GRÁFICA DE LÍNEAS CON PUNTOS (Petición del Profe)
-        st.subheader("📈 Tendencia de Seguridad Diaria (Series de Tiempo)")
-        fig_dots = px.line(df_h, x='Fecha_Dt', y='Ataques_Detectados', markers=True,
-                          title="Evolución de Ataques Detectados",
-                          labels={'Ataques_Detectados': 'Incidentes', 'Fecha_Dt': 'Línea de Tiempo'},
-                          color_discrete_sequence=['#e74c3c'])
-        fig_dots.update_traces(marker=dict(size=10, symbol='diamond'))
-        st.plotly_chart(fig_dots, use_container_width=True)
+# --- EN LA PESTAÑA 2: GRÁFICA ESTILO CAPTURAS ---
+st.subheader("📈 Evolución Diaria de Capturas")
 
-        st.divider()
+if os.path.exists("historial.csv"):
+    df_h = pd.read_csv("historial.csv")
+    df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
+    df_h = df_h.sort_values('Fecha_Dt')
+    
+    # Creamos un nombre corto para el eje X (Ej: "Lun 01")
+    df_h['Dia_Eje'] = df_h['Fecha_Dt'].dt.strftime('%a %d')
 
-        # 2. TABLAS DETALLADAS (TU ESTRUCTURA ORIGINAL)
-        for dia, grupo in df_h.groupby('Fecha'):
-            with st.expander(f"📅 JORNADA: {dia}", expanded=True):
-                st.table(grupo[['Dataset', 'Registros_Procesados', 'Ataques_Detectados', 'Puerto_Critico', 'Tiempo_Ejecucion_Seg']])
-    else:
-        st.info("ℹ️ No hay registros históricos.")
+    # Creamos la gráfica
+    fig_evolucion = px.line(
+        df_h, 
+        x='Dia_Eje', 
+        y='Ataques_Detectados',
+        markers=True,
+        text='Ataques_Detectados' # Pone el número encima del punto
+    )
+
+    # --- AQUÍ ESTÁ LA MAGIA PARA QUE SE PAREZCA A TU FOTO ---
+    fig_evolucion.update_traces(
+        mode='lines+markers',
+        line_shape='linear',
+        marker=dict(
+            symbol='square', # Puntos cuadrados como en tu imagen
+            size=10, 
+            color='#1f77b4', # Azul clásico
+            line=dict(width=1, color='white')
+        ),
+        line=dict(width=3, color='#1f77b4'),
+        textposition="top center"
+    )
+
+    # Configuración de la cuadrícula y el SCROLLBAR
+    fig_evolucion.update_layout(
+        xaxis=dict(
+            showgrid=True, 
+            gridcolor='lightgrey',
+            # Esto activa el scrollbar abajo para "correr al lado"
+            rangeslider=dict(visible=True), 
+            type='category'
+        ),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor='lightgrey',
+            range=[0, df_h['Ataques_Detectados'].max() + 2] # Para que no pegue al techo
+        ),
+        plot_bgcolor='rgba(240,240,240,0.5)', # Fondo gris suave como el de tu foto
+        height=500
+    )
+
+    st.plotly_chart(fig_evolucion, use_container_width=True)
+else:
+    st.info("No hay datos para mostrar la evolución.")
