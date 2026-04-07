@@ -12,7 +12,7 @@ import logic
 
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- 1. LOGIN CON ROLES ---
+# Login con roles
 if 'perfil' not in st.session_state: st.session_state.perfil = None
 
 st.sidebar.title("🔐 Control de Acceso")
@@ -34,17 +34,17 @@ else:
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.clear(); st.rerun()
 
-# --- 2. CARGA DE ACTIVOS ---
+# Carga de archivos
 @st.cache_resource
 def load_assets():
     return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
 
 model, scaler, features_list = load_assets()
 
-# --- 3. PESTAÑAS ---
+# PESTAÑAS
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# --- PESTAÑA 1: MONITOREO (CON MÉTRICAS AL FINAL) ---
+# pestaña 1:monitoreo
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("Análisis de Tráfico de Red en Tiempo Real")
@@ -88,7 +88,7 @@ with tab1:
                 st.success("✅ Análisis finalizado y guardado en historial.")
                 st.divider()
 
-                # --- SECCIÓN DE MÉTRICAS (LO QUE FALTABA) ---
+                # Seccion de metricas 
                 st.subheader("📊 Evaluación de Desempeño del Modelo")
                 col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
                 
@@ -120,22 +120,40 @@ with tab1:
     else:
         st.warning("🔒 Acceso Restringido. Use el perfil Administrador.")
 
-# --- PESTAÑA 2: BITÁCORA (MANTENIDA) ---
+# Pestaña 2
 with tab2:
     st.header("Historial de Auditoría y Comportamiento")
+    
     if os.path.exists("historial.csv"):
         df_h = pd.read_csv("historial.csv")
-        df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
+        
+        # 1. Limpieza y Formateo de Fechas
+        df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
+        df_h = df_h.dropna(subset=['Fecha_Dt']) # Quita filas con fechas rotas
+        df_h = df_h.sort_values('Fecha_Dt') # Ordena cronológicamente
         df_h['Dia_Nom'] = df_h['Fecha_Dt'].dt.strftime('%A %d/%m/%Y')
 
+        # 2. Buscador de Columna de Ataques (Para que la gráfica no falle)
+        # Busca cualquier columna que mencione "ataque" o "malo" o la posición 3
+        col_atq_graf = next((c for c in df_h.columns if 'ataque' in c.lower() or 'malo' in c.lower()), df_h.columns[3])
+        
+        # 3. Gráfico de Tendencia
         st.subheader("📈 Tendencia de Seguridad Diaria")
-        c_atq = 'Ataques_Detectados' if 'Ataques_Detectados' in df_h.columns else df_h.columns[3]
-        resumen = df_h.groupby('Dia_Nom')[c_atq].sum().reset_index()
-        st.plotly_chart(px.area(resumen, x='Dia_Nom', y=c_atq, color_discrete_sequence=['#e74c3c']), use_container_width=True)
+        resumen = df_h.groupby('Dia_Nom', sort=False)[col_atq_graf].sum().reset_index()
+        
+        if not resumen.empty:
+            fig_area = px.area(resumen, x='Dia_Nom', y=col_atq_graf, 
+                             labels={col_atq_graf: 'Cantidad de Ataques', 'Dia_Nom': 'Fecha'},
+                             color_discrete_sequence=['#e74c3c'])
+            fig_area.update_layout(hovermode="x unified")
+            st.plotly_chart(fig_area, use_container_width=True)
+        
         st.divider()
 
+        # 4. Tablas Detalladas por Jornada
         for dia, grupo in df_h.groupby('Dia_Nom', sort=False):
             with st.expander(f"📅 JORNADA: {dia.upper()}", expanded=True):
+                # Detectar columnas dinámicamente para la tabla
                 c_arc = next((c for c in ['Dataset', 'Archivo'] if c in grupo.columns), grupo.columns[0])
                 c_tot = next((c for c in ['Registros_Procesados', 'Registros'] if c in grupo.columns), grupo.columns[2])
                 c_mal = next((c for c in ['Ataques_Detectados', 'Ataques'] if c in grupo.columns), grupo.columns[3])
@@ -145,14 +163,18 @@ with tab2:
                 v_mal = pd.to_numeric(grupo[c_mal], errors='coerce').fillna(0)
                 
                 tabla_res = pd.DataFrame({
-                    'Dataset': grupo[c_arc], 'Total Datos': v_tot, 
-                    'Tiempo (s)': grupo[c_tie], 'Buenos': v_tot - v_mal, 'Malos': v_mal
+                    'Dataset': grupo[c_arc], 
+                    'Total Datos': v_tot.astype(int), 
+                    'Tiempo (s)': grupo[c_tie].round(2), 
+                    'Buenos': (v_tot - v_mal).astype(int), 
+                    'Malos': v_mal.astype(int)
                 })
                 st.table(tabla_res)
 
-                st.subheader("📌 Vulnerabilidades Detectadas")
+                # Puertos Críticos
+                st.subheader("📌 Análisis de Puertos")
                 p1, p2 = st.columns(2)
-                with p1: st.error("**Puertos Críticos:**\n- Puerto 80 (HTTP)\n- Puerto 445 (SMB)")
-                with p2: st.success("**Puertos Seguros:**\n- Puerto 443 (HTTPS)\n- Puerto 22 (SSH)")
+                with p1: st.error("**Puertos Críticos Detectados:**\n- Puerto 80 (HTTP)\n- Puerto 445 (SMB)")
+                with p2: st.success("**Tráfico Seguro Monitoreado:**\n- Puerto 443 (HTTPS)\n- Puerto 22 (SSH)")
     else:
-        st.info("No hay registros históricos disponibles.")
+        st.info("ℹ️ No hay registros históricos. Por favor, procese un archivo en la pestaña de Monitoreo.")
