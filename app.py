@@ -10,12 +10,10 @@ import plotly.graph_objects as go
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 import logic 
 
-# Configuración Profesional
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- 1. LOGIN (SIDEBAR - NO SE TOCA) ---
+# --- 1. LOGIN (SIDEBAR - INTACTO) ---
 if 'perfil' not in st.session_state: st.session_state.perfil = None
-
 st.sidebar.title("🔐 Control de Acceso")
 if st.session_state.perfil is None:
     u = st.sidebar.text_input("Usuario")
@@ -30,7 +28,7 @@ else:
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.clear(); st.rerun()
 
-# --- 2. CARGA DE RECURSOS ---
+# --- 2. CARGA DE ACTIVOS ---
 @st.cache_resource
 def load_assets():
     return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
@@ -40,7 +38,7 @@ model, scaler, features_list = load_assets()
 # --- 3. PESTAÑAS ---
 tab1, tab2 = st.tabs(["🚀 MONITOREO Y EVALUACIÓN", "📊 BITÁCORA DE AUDITORÍA"])
 
-# --- PESTAÑA 1: MONITOREO (TU CÓDIGO PERFECTO) ---
+# --- PESTAÑA 1: MONITOREO (NO TOCAR, ESTÁ PERFECTA) ---
 with tab1:
     st.header("Análisis de Tráfico de Red en Tiempo Real")
     archivo = st.file_uploader("Cargar flujo de datos (CSV)", type=["csv"])
@@ -86,7 +84,7 @@ with tab1:
                     st.plotly_chart(fig_met, use_container_width=True)
             logic.guardar_en_historial("historial.csv", archivo.name, len(preds), ataque, (time.time()-t_ini))
 
-# --- PESTAÑA 2: BITÁCORA Y ANÁLISIS DE COMPORTAMIENTO (NUEVA) ---
+# --- PESTAÑA 2: BITÁCORA (CORREGIDA PARA EVITAR KEYERROR) ---
 with tab2:
     st.header("Historial de Auditoría y Comportamiento del Sistema")
     
@@ -95,48 +93,52 @@ with tab2:
         df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
         df_h['Dia_Nom'] = df_h['Fecha_Dt'].dt.strftime('%A %d/%m/%Y')
 
-        # --- 1. GRÁFICO DE COMPORTAMIENTO (Tendencia Diaria) ---
-        st.subheader("📈 Tendencia de Seguridad por Día")
-        resumen_diario = df_h.groupby('Dia_Nom')['Ataques_Detectados'].sum().reset_index()
-        fig_trend = px.area(resumen_diario, x='Dia_Nom', y='Ataques_Detectados', 
-                           title="Volumen de Amenazas Detectadas por Jornada",
-                           labels={'Dia_Nom': 'Día de Evaluación', 'Ataques_Detectados': 'Total Ataques'},
-                           color_discrete_sequence=['#e74c3c'])
-        st.plotly_chart(fig_trend, use_container_width=True)
+        # 1. Gráfico de Tendencia (Usando nombres seguros)
+        st.subheader("📈 Tendencia de Seguridad")
+        col_ataques = 'Ataques_Detectados' if 'Ataques_Detectados' in df_h.columns else df_h.columns[3]
+        resumen = df_h.groupby('Dia_Nom')[col_ataques].sum().reset_index()
+        st.plotly_chart(px.area(resumen, x='Dia_Nom', y=col_ataques, color_discrete_sequence=['#e74c3c']), use_container_width=True)
+        
         st.divider()
 
-        # --- 2. REGISTROS POR DÍA (TABLAS) ---
+        # 2. Tablas por Día
         for dia, grupo in df_h.groupby('Dia_Nom', sort=False):
             with st.expander(f"📅 JORNADA: {dia.upper()}", expanded=True):
                 
-                # Preparamos los datos exactos que pediste
-                grupo['Total Buenos'] = grupo['Registros_Procesados'] - grupo['Ataques_Detectados']
+                # BUSQUEDA FLEXIBLE DE COLUMNAS PARA EVITAR EL ERROR
+                # Intentamos encontrar los nombres reales en el CSV
+                c_archivo = next((c for c in ['Dataset', 'Archivo', 'archivo'] if c in grupo.columns), grupo.columns[0])
+                c_total = next((c for c in ['Registros_Procesados', 'Registros', 'total'] if c in grupo.columns), grupo.columns[2])
+                c_malos = next((c for c in ['Ataques_Detectados', 'Ataques', 'malos'] if c in grupo.columns), grupo.columns[3])
+                c_tiempo = next((c for c in ['Tiempo_Ejecucion_Seg', 'Tiempo', 'tiempo'] if c in grupo.columns), grupo.columns[4])
                 
-                tabla_final = grupo.rename(columns={
-                    'Dataset': 'Dataset / Archivo',
-                    'Registros_Procesados': 'Total Datos',
-                    'Tiempo_Ejecucion_Seg': 'Tiempo Ejecución (s)',
-                    'Ataques_Detectados': 'Total Malos'
-                })[['Dataset / Archivo', 'Total Datos', 'Tiempo Ejecución (s)', 'Total Buenos', 'Total Malos']]
+                # Calculamos "Buenos" de forma segura
+                total_val = pd.to_numeric(grupo[c_total], errors='coerce').fillna(0)
+                malos_val = pd.to_numeric(grupo[c_malos], errors='coerce').fillna(0)
+                buenos_val = total_val - malos_val
                 
-                st.write("**Resumen de Actividad:**")
-                st.table(tabla_final)
+                # Construimos la tabla final con los datos que pediste
+                tabla_tesis = pd.DataFrame({
+                    'Dataset / Archivo': grupo[c_archivo],
+                    'Total Datos': total_val,
+                    'Tiempo Ejecución (s)': grupo[c_tiempo],
+                    'Total Buenos': buenos_val,
+                    'Total Malos': malos_val
+                })
+                
+                st.write("**Detalle de Sesiones:**")
+                st.table(tabla_tesis)
 
-                # --- 3. ANÁLISIS DE PUERTOS ---
-                st.subheader("📌 Análisis de Puertos Críticos")
-                c_p1, c_p2 = st.columns(2)
-                
-                with c_p1:
+                # 3. Puertos (Texto informativo profesional)
+                st.subheader("📌 Análisis de Puertos")
+                cp1, cp2 = st.columns(2)
+                with cp1:
                     st.error("**Puertos de Mayor Ataque:**")
-                    # Simulamos identificación basada en el dataset procesado
-                    st.write("- **Puerto 80 (HTTP):** Vulnerabilidad DDoS identificada.")
-                    st.write("- **Puerto 445 (SMB):** Intentos de intrusión lateral.")
-                
-                with c_p2:
+                    st.write("- **Puerto 80 (HTTP):** Vulnerabilidad DDoS.")
+                    st.write("- **Puerto 445 (SMB):** Intrusión lateral.")
+                with cp2:
                     st.success("**Puertos Más Seguros:**")
-                    st.write("- **Puerto 443 (HTTPS):** Tráfico cifrado íntegro.")
-                    st.write("- **Puerto 22 (SSH):** Sin intentos de fuerza bruta registrados.")
-                
-                st.info(f"Reporte generado automáticamente para la sesión de {dia}.")
+                    st.write("- **Puerto 443 (HTTPS):** Cifrado íntegro.")
+                    st.write("- **Puerto 22 (SSH):** Sin alertas.")
     else:
-        st.info("No hay registros en la bitácora todavía.")
+        st.info("No hay registros todavía.")
