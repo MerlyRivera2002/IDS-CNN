@@ -4,7 +4,7 @@ from datetime import datetime
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc, precision=None, recall=None, f1=None):
     """
-    Guarda los resultados de la simulación incluyendo hora exacta.
+    Guarda los resultados de la simulación incluyendo hora exacta y todas las métricas.
     """
     normales = total - ataques
     ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
