@@ -57,149 +57,153 @@ with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
         archivo = st.file_uploader("Subir dataset para simulación", type=["csv"], key="uploader_sim")
-
+        
+        # Contenedores que siempre existen (se crean una sola vez)
+        # Inicialmente vacíos o con mensaje de espera
+        col_izq, col_der = st.columns([1, 1])
+        with col_izq:
+            espacio_pastel = st.empty()
+        with col_der:
+            espacio_metricas = st.empty()
+        st.divider()
+        st.subheader("🛰️ Registro de Actividad")
+        espacio_tabla = st.empty()
+        
+        # Mensaje de bienvenida si no hay simulación
+        if 'simulacion_activa' not in st.session_state:
+            st.session_state.simulacion_activa = False
+            # Mostrar mensaje inicial en los contenedores
+            espacio_pastel.info("👈 Esperando inicio de simulación")
+            espacio_metricas.info("Los resultados aparecerán aquí")
+            espacio_tabla.info("Los registros se mostrarán durante el monitoreo")
+        
         if archivo:
             if st.button("🚀 INICIAR MONITOREO"):
-                # Contenedores para la simulación en vivo
-                col_izq, col_der = st.columns([1, 1])
-                with col_izq:
-                    espacio_pastel = st.empty()
-                with col_der:
-                    espacio_metricas = st.empty()
-
-                st.divider()
-                st.subheader("🛰️ Registro de Actividad")
-                espacio_tabla = st.empty()
-
-                # Procesamiento de datos
-                df_raw = pd.read_csv(archivo)
-                df_raw.columns = df_raw.columns.str.strip()
-                df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
-
-                preds_totales = []
-                t_inicio = time.time()
-
-                # Bucle de simulación
-                for i in range(0, len(df_clean), 15):
-                    chunk = df_clean.iloc[i: i + 15]
-                    X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
-                    chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
-                    preds_totales.extend(chunk_preds)
-
-                    ataques = sum(preds_totales)
-                    normales = len(preds_totales) - ataques
-
-                    # Gráfico de pastel
-                    fig_pie = px.pie(values=[normales, ataques],
-                                     names=['Seguro', 'Amenaza'],
-                                     color_discrete_sequence=['#2ecc71', '#e74c3c'],
-                                     hole=0.6)
-                    fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=True)
-                    espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{i}")
-
-                    # Métricas
-                    with espacio_metricas.container():
-                        st.metric("CONEXIONES TOTALES", f"{len(preds_totales)}")
-                        st.metric("INTRUSIONES DETECTADAS", f"{ataques}",
-                                  delta=f"+{chunk_preds.sum()}", delta_color="inverse")
-
-                    # Tabla de diagnóstico
-                    with espacio_tabla.container():
-                        vista = chunk.copy()
-                        vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
-
-                        def sugerir_amenaza(row):
-                            if "NORMAL" in row['Estado']:
-                                return "Tráfico Seguro"
-                            p = row['Destination Port']
-                            if p in [80, 443]:
-                                return "Ataque Web (HTTP/S)"
-                            if p == 22:
-                                return "Fuerza Bruta (SSH)"
-                            if p == 21:
-                                return "Acceso FTP"
-                            return "Escaneo / Port Scan"
-
-                        vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
-                        st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
-
-                    time.sleep(0.08)
-
-                st.success("✅ Simulación finalizada.")
-                st.divider()
-
-                # --- Evaluación final ---
-                st.subheader("📊 Evaluación del Rendimiento (Final)")
-                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
-
-                acc_historial = 0.0
-                prec, rec, f1 = None, None, None
-
-                if col_label:
-                    y_true = df_clean[col_label].astype(str).str.upper().apply(
-                        lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1
-                    )
-                    y_true = y_true[:len(preds_totales)]
-
-                    acc_historial = accuracy_score(y_true, preds_totales)
-                    prec = precision_score(y_true, preds_totales, zero_division=0)
-                    rec = recall_score(y_true, preds_totales, zero_division=0)
-                    f1 = f1_score(y_true, preds_totales, zero_division=0)
-
-                    c_mat, c_line = st.columns([1, 1])
-                    with c_mat:
-                        st.write("**Matriz de Confusión**")
-                        cm = confusion_matrix(y_true, preds_totales)
-                        fig_cm = px.imshow(cm, text_auto=True,
-                                           x=['Pred: Norm', 'Pred: Atq'],
-                                           y=['Real: Norm', 'Real: Atq'],
-                                           color_continuous_scale='Reds')
-                        st.plotly_chart(fig_cm, use_container_width=True)
-
-                    with c_line:
-                        st.write("**Gráfico de Rendimiento (Scores)**")
-                        df_m = pd.DataFrame({
-                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
-                            'Valor': [acc_historial, prec, rec, f1]
-                        })
-                        fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True,
-                                        text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
-                        fig_m.update_traces(line_color='#1f77b4',
-                                            marker=dict(size=12, symbol='square', color='#ff7f0e'))
-                        fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
-                        st.plotly_chart(fig_m, use_container_width=True)
-
-                # --- Guardar en historial ---
-                p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
-                if col_label:
-                    logic.guardar_en_historial(
-                        "historial.csv",
-                        archivo.name,
-                        len(preds_totales),
-                        ataques,
-                        (time.time() - t_inicio),
-                        fecha_simulada,
-                        p_top,
-                        acc_historial,
-                        precision=prec,
-                        recall=rec,
-                        f1=f1
-                    )
-                else:
-                    logic.guardar_en_historial(
-                        "historial.csv",
-                        archivo.name,
-                        len(preds_totales),
-                        ataques,
-                        (time.time() - t_inicio),
-                        fecha_simulada,
-                        p_top,
-                        0.0
-                    )
-                st.toast("Simulación registrada en Bitácora")
+                # Limpiar contenedores y mostrar spinner
+                with st.spinner("Cargando datos y preparando simulación..."):
+                    # Procesamiento de datos
+                    df_raw = pd.read_csv(archivo)
+                    df_raw.columns = df_raw.columns.str.strip()
+                    df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
+                    
+                    preds_totales = []
+                    t_inicio = time.time()
+                    
+                    # Bucle de simulación (sin actualizar contenedores todavía)
+                    # Primero procesamos rápidamente para no bloquear la UI? No, porque queremos la animación.
+                    # Mantenemos el bucle con sleep pero actualizando los contenedores en cada iteración.
+                    # Pero para evitar el blanco inicial, vamos a poner un mensaje de "Simulando..."
+                    espacio_pastel.info("🔄 Simulación en progreso...")
+                    espacio_metricas.info("Procesando tráfico...")
+                    espacio_tabla.info("Generando registros...")
+                    
+                    for i in range(0, len(df_clean), 15):
+                        chunk = df_clean.iloc[i: i + 15]
+                        X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
+                        chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
+                        preds_totales.extend(chunk_preds)
+                        
+                        ataques = sum(preds_totales)
+                        normales = len(preds_totales) - ataques
+                        
+                        # Actualizar gráfico de pastel
+                        fig_pie = px.pie(values=[normales, ataques],
+                                         names=['Seguro', 'Amenaza'],
+                                         color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                                         hole=0.6)
+                        fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=True)
+                        espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{i}")
+                        
+                        # Actualizar métricas
+                        with espacio_metricas.container():
+                            st.metric("CONEXIONES TOTALES", f"{len(preds_totales)}")
+                            st.metric("INTRUSIONES DETECTADAS", f"{ataques}",
+                                      delta=f"+{chunk_preds.sum()}", delta_color="inverse")
+                        
+                        # Actualizar tabla de diagnóstico
+                        with espacio_tabla.container():
+                            vista = chunk.copy()
+                            vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
+                            
+                            def sugerir_amenaza(row):
+                                if "NORMAL" in row['Estado']:
+                                    return "Tráfico Seguro"
+                                p = row['Destination Port']
+                                if p in [80, 443]:
+                                    return "Ataque Web (HTTP/S)"
+                                if p == 22:
+                                    return "Fuerza Bruta (SSH)"
+                                if p == 21:
+                                    return "Acceso FTP"
+                                return "Escaneo / Port Scan"
+                            
+                            vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
+                            st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
+                        
+                        time.sleep(0.08)
+                    
+                    # Fin del bucle
+                    st.session_state.simulacion_activa = True
+                    st.success("✅ Simulación finalizada.")
+                    st.divider()
+                    
+                    # Evaluación final (igual que antes)
+                    st.subheader("📊 Evaluación del Rendimiento (Final)")
+                    col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+                    acc_historial = 0.0
+                    prec, rec, f1 = None, None, None
+                    
+                    if col_label:
+                        y_true = df_clean[col_label].astype(str).str.upper().apply(
+                            lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1
+                        )
+                        y_true = y_true[:len(preds_totales)]
+                        acc_historial = accuracy_score(y_true, preds_totales)
+                        prec = precision_score(y_true, preds_totales, zero_division=0)
+                        rec = recall_score(y_true, preds_totales, zero_division=0)
+                        f1 = f1_score(y_true, preds_totales, zero_division=0)
+                        
+                        c_mat, c_line = st.columns([1, 1])
+                        with c_mat:
+                            st.write("**Matriz de Confusión**")
+                            cm = confusion_matrix(y_true, preds_totales)
+                            fig_cm = px.imshow(cm, text_auto=True,
+                                               x=['Pred: Norm', 'Pred: Atq'],
+                                               y=['Real: Norm', 'Real: Atq'],
+                                               color_continuous_scale='Reds')
+                            st.plotly_chart(fig_cm, use_container_width=True)
+                        with c_line:
+                            st.write("**Gráfico de Rendimiento (Scores)**")
+                            df_m = pd.DataFrame({
+                                'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+                                'Valor': [acc_historial, prec, rec, f1]
+                            })
+                            fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True,
+                                            text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
+                            fig_m.update_traces(line_color='#1f77b4',
+                                                marker=dict(size=12, symbol='square', color='#ff7f0e'))
+                            fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
+                            st.plotly_chart(fig_m, use_container_width=True)
+                    
+                    # Guardar en historial
+                    p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
+                    if col_label:
+                        logic.guardar_en_historial(
+                            "historial.csv", archivo.name, len(preds_totales), ataques,
+                            (time.time() - t_inicio), fecha_simulada, p_top, acc_historial,
+                            precision=prec, recall=rec, f1=f1
+                        )
+                    else:
+                        logic.guardar_en_historial(
+                            "historial.csv", archivo.name, len(preds_totales), ataques,
+                            (time.time() - t_inicio), fecha_simulada, p_top, 0.0
+                        )
+                    st.toast("Simulación registrada en Bitácora")
+        else:
+            # Si no hay archivo subido, mostrar mensaje en los contenedores (ya se hizo arriba)
+            pass
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
-
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 
 with tab2:
