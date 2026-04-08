@@ -47,6 +47,7 @@ model, scaler, features_list = load_assets()
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
 # ----------------------------------------- PESTAÑA 1 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 1 -----------------------------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -168,7 +169,6 @@ with tab1:
                 )
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
-
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 
 with tab2:
