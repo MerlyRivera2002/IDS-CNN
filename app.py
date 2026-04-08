@@ -40,17 +40,13 @@ else:
 # Carga de activos
 @st.cache_resource
 def load_assets():
-    # Asegúrate de que estos archivos estén en la misma carpeta que el script
-    model = tf.keras.models.load_model("modelo_cnn.keras")
-    scaler = joblib.load("scaler.pkl")
-    features = joblib.load("features.pkl")
-    return model, scaler, features
+    return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
 
 model, scaler, features_list = load_assets()
 
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# ----------------------------------------- PESTAÑA 1 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 1 (COMPLETA Y CORREGIDA) ------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -77,7 +73,7 @@ with tab1:
                 preds_totales = []
                 t_inicio = time.time()
                 
-                # 2. BUCLE DE SIMULACIÓN (FLUÍDO)
+                # 2. BUCLE DE SIMULACIÓN
                 for i in range(0, len(df_clean), 15): 
                     chunk = df_clean.iloc[i : i + 15]
                     X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
@@ -87,18 +83,18 @@ with tab1:
                     ataques = sum(preds_totales)
                     normales = len(preds_totales) - ataques
                     
-                    # A. Actualizar Gráfico de Pastel
+                    # A. Gráfico de Pastel
                     fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'], 
                                    color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6)
                     fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=True)
                     espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{i}")
                     
-                    # B. Actualizar Métricas
+                    # B. Métricas
                     with espacio_metricas.container():
                         st.metric("CONEXIONES TOTALES", f"{len(preds_totales)}")
                         st.metric("INTRUSIONES DETECTADAS", f"{ataques}", delta=f"+{chunk_preds.sum()}", delta_color="inverse")
 
-                    # C. Actualizar Tabla con Diagnóstico
+                    # C. Tabla con Diagnóstico
                     with espacio_tabla.container():
                         vista = chunk.copy()
                         vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
@@ -119,11 +115,12 @@ with tab1:
                 st.success("✅ Simulación finalizada.")
                 st.divider()
 
-                # 3. MÉTRICAS FINALES
+                # 3. MÉTRICAS FINALES Y GUARDADO (PUNTO CRÍTICO)
                 st.subheader("📊 Evaluación del Rendimiento (Final)")
                 col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
                 
-                acc = 0.0 # Valor por defecto si no hay etiquetas reales
+                acc = 0.0 # Valor base
+                
                 if col_label:
                     y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
                     y_true = y_true[:len(preds_totales)]
@@ -142,27 +139,23 @@ with tab1:
                     
                     with c_line:
                         st.write("**Gráfico de Rendimiento (Scores)**")
-                        df_m = pd.DataFrame({
-                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
-                            'Valor': [acc, prec, rec, f1]
-                        })
+                        df_m = pd.DataFrame({'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'], 'Valor': [acc, prec, rec, f1]})
                         fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True, text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
-                        fig_m.update_traces(line_color='#1f77b4', marker=dict(size=12, symbol='square', color='#ff7f0e'))
                         fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
                         st.plotly_chart(fig_m, use_container_width=True)
                 
-                # GUARDAR EN HISTORIAL
+                # --- AQUÍ ESTABA EL ERROR: AHORA ENVÍA LOS 8 DATOS CORRECTOS ---
                 p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
-     logic.guardar_en_historial(
-    "historial.csv",      # 1. archivo_hist
-    archivo.name,         # 2. nombre_dataset
-    len(preds_totales),   # 3. total
-    ataques,              # 4. ataques
-    (time.time()-t_inicio), # 5. tiempo
-    fecha_simulada,       # 6. fecha_simulada
-    p_top,                # 7. puerto_top
-    acc                   # 8. acc (el accuracy calculado)
-)
+                logic.guardar_en_historial(
+                    "historial.csv", 
+                    archivo.name, 
+                    len(preds_totales), 
+                    ataques, 
+                    (time.time()-t_inicio), 
+                    fecha_simulada, 
+                    p_top, 
+                    acc
+                )
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
