@@ -13,7 +13,7 @@ import logic
 
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- LOGIN (igual que antes) ---
+# --- LOGIN (igual) ---
 if 'perfil' not in st.session_state:
     st.session_state.perfil = None
 
@@ -50,10 +50,10 @@ def load_assets():
 model, scaler, features_list = load_assets()
 
 # Crear las 3 pestañas
-tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 REPORTES Y DESCARGA"])
+tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 MOVIMIENTOS Y REPORTES"])
 
 # =====================================================================
-# PESTAÑA 1: SIMULACIÓN (mejorada con barra de progreso y gráficos)
+# PESTAÑA 1: SIMULACIÓN (igual que antes, pero sin cambios)
 # =====================================================================
 with tab1:
     if st.session_state.perfil == "Administrador":
@@ -62,7 +62,7 @@ with tab1:
         # Controles
         col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([2, 1, 1])
         with col_ctrl1:
-            archivo = st.file_uploader("Subir dataset CSV (CIC-IDS2017 o similar)", type=["csv"], key="uploader_sim")
+            archivo = st.file_uploader("Subir dataset CSV", type=["csv"], key="uploader_sim")
         with col_ctrl2:
             velocidad = st.slider("Velocidad (segundos/lote)", min_value=0.02, max_value=0.5, value=0.08, step=0.02)
         with col_ctrl3:
@@ -71,7 +71,7 @@ with tab1:
                     del st.session_state.simulacion_activa
                 st.rerun()
         
-        # Contenedores dinámicos (siempre presentes)
+        # Contenedores dinámicos
         col_izq, col_der = st.columns([1, 1])
         with col_izq:
             espacio_pastel = st.empty()
@@ -122,14 +122,14 @@ with tab1:
                         progress = (inicio + len(chunk)) / total_registros
                         progress_bar.progress(min(progress, 1.0), text=f"Procesando {int(progress*100)}%")
                         
-                        # Pastel
+                        # Gráfico de pastel
                         fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'],
                                          color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6,
                                          title=f"Tráfico actual (Total: {len(preds_totales)})")
                         fig_pie.update_layout(height=280)
                         espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{idx}")
                         
-                        # Evolución
+                        # Evolución de ataques
                         df_evol = pd.DataFrame({'Registros': tiempos, 'Ataques': ataques_acumulados})
                         fig_evol = px.line(df_evol, x='Registros', y='Ataques', title='Evolución de intrusiones',
                                            labels={'Ataques': 'Ataques detectados'})
@@ -191,7 +191,7 @@ with tab1:
                     with col_r3: st.metric("Tiempo simulación", f"{elapsed_total:.2f} s")
                     with col_r4: st.metric("Eficiencia", f"{len(preds_totales)/elapsed_total:.1f} reg/s")
                     
-                    # Evaluación final con etiquetas
+                    # Evaluación final con etiquetas y guardado
                     col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
                     if col_label:
                         y_true = df_clean[col_label].astype(str).str.upper().apply(
@@ -208,7 +208,6 @@ with tab1:
                         with col_m3: st.metric("Recall", f"{rec:.2%}")
                         with col_m4: st.metric("F1-Score", f"{f1:.2%}")
                         
-                        # Guardar en historial
                         p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
                         logic.guardar_en_historial(
                             "historial.csv", archivo.name, len(preds_totales), ataques,
@@ -223,20 +222,19 @@ with tab1:
                         )
                     st.toast("Simulación registrada en Bitácora")
         else:
-            # No hay archivo, ya se muestran los mensajes iniciales
             pass
     else:
-        st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
+        st.warning("🔒 Solo Administradores.")
 
 # =====================================================================
-# PESTAÑA 2: ANÁLISIS Y TENDENCIAS
+# PESTAÑA 2: ANÁLISIS Y TENDENCIAS (solo KPIs, gráficas históricas, tabla global)
 # =====================================================================
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        # KPIs
+        # KPIs globales
         st.subheader("📌 Resumen global")
         col1, col2, col3, col4 = st.columns(4)
         with col1: st.metric("Total simulaciones", len(df_h))
@@ -260,7 +258,6 @@ with tab2:
             fig1.update_traces(line_color='#e74c3c')
             st.plotly_chart(fig1, use_container_width=True)
         with c2:
-            # Top 5 puertos históricos
             puertos_hist = df_h['Puerto'].value_counts().head(5).reset_index()
             puertos_hist.columns = ['Puerto', 'Frecuencia']
             fig_puertos = px.bar(puertos_hist, x='Puerto', y='Frecuencia',
@@ -270,31 +267,54 @@ with tab2:
         
         st.divider()
         
-        # Tabla completa con todas las métricas
+        # Tabla con todas las simulaciones (solo columnas existentes)
         st.subheader("📋 Registro detallado de todas las simulaciones")
-        # Seleccionar y formatear columnas
-        columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
-                    'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
-        for col in columnas:
-            if col not in df_h.columns:
-                df_h[col] = np.nan
-        df_display = df_h.copy()
+        # Definir columnas deseadas, pero filtrar las que realmente existen
+        columnas_deseadas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
+                             'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+        columnas_existentes = [col for col in columnas_deseadas if col in df_h.columns]
+        df_display = df_h[columnas_existentes].copy()
+        # Formatear porcentajes si existen
         for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-        st.dataframe(df_display[columnas], use_container_width=True, height=400)
+        st.dataframe(df_display, use_container_width=True, height=400)
     else:
         st.info("💡 No hay datos históricos. Realiza una simulación en la Pestaña 1.")
 
 # =====================================================================
-# PESTAÑA 3: REPORTES Y DESCARGA
+# PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
 # =====================================================================
 with tab3:
-    st.header("📋 Reportes personalizados y exportación")
+    st.header("📋 Movimientos y reportes personalizados")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        st.subheader("📅 Filtrar por rango de fechas")
+        # --- Mostrar cada simulación como un "movimiento" (tabla completa) ---
+        st.subheader("📌 Listado de movimientos (cada simulación)")
+        columnas_mov = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
+                        'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+        # Filtrar solo columnas existentes
+        col_existentes = [col for col in columnas_mov if col in df_h.columns]
+        df_mov = df_h[col_existentes].copy()
+        # Formatear porcentajes
+        for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
+            if col in df_mov.columns:
+                df_mov[col] = df_mov[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
+        st.dataframe(df_mov, use_container_width=True, height=350)
+        
+        st.divider()
+        
+        # --- Gráfico de barras: ataques por fecha (movimientos) ---
+        st.subheader("📊 Ataques por fecha de simulación")
+        fig_mov = px.bar(df_h, x='Fecha', y='Ataques', title='Cantidad de ataques detectados por fecha',
+                         color='Ataques', color_continuous_scale='Reds')
+        st.plotly_chart(fig_mov, use_container_width=True)
+        
+        st.divider()
+        
+        # --- Reportes descargables por rango de fechas ---
+        st.subheader("📥 Reporte por rango de fechas")
         min_fecha = df_h['Fecha'].min().date()
         max_fecha = df_h['Fecha'].max().date()
         
@@ -308,25 +328,21 @@ with tab3:
         df_filtrado = df_h.loc[mask].copy()
         
         if df_filtrado.empty:
-            st.warning("No hay registros en ese rango.")
+            st.warning("⚠️ No hay registros en ese rango.")
         else:
-            st.success(f"✅ {len(df_filtrado)} registros encontrados.")
-            
+            st.success(f"✅ {len(df_filtrado)} registros encontrados entre {fecha_ini} y {fecha_fin}.")
             # Mostrar tabla filtrada
-            st.subheader("📋 Datos del reporte")
-            columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Ataques', 'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto']
-            df_show = df_filtrado[columnas].copy()
+            st.write("**Vista previa del reporte**")
+            df_prev = df_filtrado[col_existentes].copy()
             for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-                if col in df_show.columns:
-                    df_show[col] = df_show[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-            st.dataframe(df_show, use_container_width=True)
+                if col in df_prev.columns:
+                    df_prev[col] = df_prev[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
+            st.dataframe(df_prev, use_container_width=True)
             
-            # Gráfico resumen del reporte
-            st.subheader("📊 Resumen gráfico del reporte")
-            if not df_filtrado.empty:
-                fig_report = px.bar(df_filtrado, x='Fecha', y='Ataques', title='Ataques por fecha en el periodo seleccionado',
-                                    color='Ataques', color_continuous_scale='Reds')
-                st.plotly_chart(fig_report, use_container_width=True)
+            # Gráfico del reporte
+            fig_rep = px.bar(df_filtrado, x='Fecha', y='Ataques', title='Ataques en el periodo seleccionado',
+                             color='Ataques', color_continuous_scale='Reds')
+            st.plotly_chart(fig_rep, use_container_width=True)
             
             # Botón de descarga
             csv_buffer = io.StringIO()
@@ -340,19 +356,21 @@ with tab3:
             )
         
         st.divider()
+        
+        # --- Reporte completo (todo el historial) ---
         st.subheader("📥 Exportar historial completo")
         csv_total = io.StringIO()
         df_h.to_csv(csv_total, index=False)
         st.download_button(
-            label="📎 Descargar todo el historial",
+            label="📎 Descargar todas las simulaciones",
             data=csv_total.getvalue(),
             file_name="historial_completo.csv",
             mime="text/csv",
             use_container_width=True
         )
         
-        # Opción para borrar historial
-        if st.button("🗑️ Borrar todo el historial", type="secondary"):
+        # --- Botón para borrar historial (con precaución) ---
+        if st.button("⚠️ Borrar todo el historial", type="secondary"):
             if os.path.exists("historial.csv"):
                 os.remove("historial.csv")
                 st.success("Historial eliminado. Recarga la página.")
