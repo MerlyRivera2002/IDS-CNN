@@ -199,36 +199,46 @@ with tab1:
                         rec = recall_score(y_true, preds_totales, zero_division=0)
                         f1 = f1_score(y_true, preds_totales, zero_division=0)
                         
-                        # --- GRÁFICO DE BARRAS PARA MÉTRICAS (estilo imagen) ---
+                        # --- GRÁFICO DE BARRAS ESTILO PROFESIONAL ---
                         st.write("**📊 Métricas de rendimiento del modelo CNN**")
                         df_metricas = pd.DataFrame({
                             'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
                             'Valor (%)': [acc*100, prec*100, rec*100, f1*100]
                         })
+                        colores_barras = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
                         fig_metricas = px.bar(
-                            df_metricas, 
-                            x='Métrica', 
+                            df_metricas,
+                            x='Métrica',
                             y='Valor (%)',
                             text=df_metricas['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
                             color='Métrica',
-                            color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
-                            title="Rendimiento del modelo en clasificación binaria"
+                            color_discrete_sequence=colores_barras,
+                            title="Rendimiento del modelo (clasificación binaria)"
                         )
                         fig_metricas.update_traces(
                             textposition='outside',
+                            textfont_size=12,
                             marker_line_width=1.5,
                             marker_line_color='white',
-                            opacity=0.9
+                            opacity=0.9,
+                            width=0.6
                         )
                         fig_metricas.update_layout(
-                            yaxis=dict(title="Porcentaje (%)", range=[0, max(df_metricas['Valor (%)']) + 10], gridcolor='lightgray'),
+                            yaxis=dict(
+                                title="Porcentaje (%)",
+                                range=[0, max(df_metricas['Valor (%)']) + 10],
+                                gridcolor='lightgray',
+                                gridwidth=0.5,
+                                showgrid=True
+                            ),
                             xaxis_title="",
                             plot_bgcolor='white',
                             showlegend=False,
-                            font=dict(size=12)
+                            font=dict(size=13, family="Arial"),
+                            margin=dict(t=50, b=30)
                         )
                         st.plotly_chart(fig_metricas, use_container_width=True)
-                        # ------------------------------------------
+                        # -------------------------------------------------
                         
                         p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
                         logic.guardar_en_historial(
@@ -247,7 +257,6 @@ with tab1:
             pass
     else:
         st.warning("🔒 Solo Administradores.")
-
 # =====================================================================
 # PESTAÑA 2: ANÁLISIS Y TENDENCIAS (solo KPIs, gráficas históricas, tabla global)
 # =====================================================================
