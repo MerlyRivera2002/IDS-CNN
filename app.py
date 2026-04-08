@@ -52,6 +52,7 @@ model, scaler, features_list = load_assets()
 # Crear las 3 pestañas
 tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 MOVIMIENTOS Y REPORTES"])
 #-------------------------------------------pestaña 1-------------------------------------------
+
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -198,21 +199,34 @@ with tab1:
                         rec = recall_score(y_true, preds_totales, zero_division=0)
                         f1 = f1_score(y_true, preds_totales, zero_division=0)
                         
-                        # --- NUEVO GRÁFICO DE BARRAS PARA MÉTRICAS ---
+                        # --- GRÁFICO DE BARRAS PARA MÉTRICAS (estilo imagen) ---
                         st.write("**📊 Métricas de rendimiento del modelo CNN**")
                         df_metricas = pd.DataFrame({
                             'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
-                            'Valor': [acc, prec, rec, f1]
+                            'Valor (%)': [acc*100, prec*100, rec*100, f1*100]
                         })
-                        # Colores personalizados
-                        colores_metricas = ['#2ecc71', '#e74c3c', '#f39c12', '#3498db']
-                        fig_metricas = px.bar(df_metricas, x='Métrica', y='Valor',
-                                              text=df_metricas['Valor'].apply(lambda x: f"{x:.2%}"),
-                                              color='Métrica', color_discrete_sequence=colores_metricas,
-                                              title="Rendimiento del modelo (clasificación binaria)")
-                        fig_metricas.update_traces(textposition='outside', marker_line_width=1.5)
-                        fig_metricas.update_layout(yaxis=dict(range=[0, 1.1], title="Valor", tickformat=".0%"),
-                                                   xaxis_title="", showlegend=False)
+                        fig_metricas = px.bar(
+                            df_metricas, 
+                            x='Métrica', 
+                            y='Valor (%)',
+                            text=df_metricas['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
+                            color='Métrica',
+                            color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
+                            title="Rendimiento del modelo en clasificación binaria"
+                        )
+                        fig_metricas.update_traces(
+                            textposition='outside',
+                            marker_line_width=1.5,
+                            marker_line_color='white',
+                            opacity=0.9
+                        )
+                        fig_metricas.update_layout(
+                            yaxis=dict(title="Porcentaje (%)", range=[0, max(df_metricas['Valor (%)']) + 10], gridcolor='lightgray'),
+                            xaxis_title="",
+                            plot_bgcolor='white',
+                            showlegend=False,
+                            font=dict(size=12)
+                        )
                         st.plotly_chart(fig_metricas, use_container_width=True)
                         # ------------------------------------------
                         
