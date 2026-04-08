@@ -154,47 +154,48 @@ with tab1:
 
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 with tab2:
-    st.header("📊 Bitácora de Capturas")
-    st.subheader("📈 Evolución Diaria de Capturas")
-
+    st.header("📊 Inteligencia de Amenazas y Reportes")
+    
     if os.path.exists("historial.csv"):
         df_h = pd.read_csv("historial.csv")
         df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
         df_h = df_h.sort_values('Fecha_Dt')
-        df_h['Dia_Eje'] = df_h['Fecha_Dt'].dt.strftime('%a %d')
 
-        fig_evolucion = px.line(
-            df_h, x='Dia_Eje', y='Ataques_Detectados',
-            markers=True, text='Ataques_Detectados'
-        )
+        # --- 1. TENDENCIA GLOBAL (Líneas con puntitos) ---
+        st.subheader("📈 Comportamiento Diario de Intrusiones")
+        fig_ataques = px.line(df_h, x='Fecha', y='Ataques_Detectados', markers=True,
+                              text='Ataques_Detectados', title="Evolución de Amenazas por Día")
+        fig_ataques.update_traces(line_color='#1f77b4', marker=dict(symbol='square', size=10))
+        st.plotly_chart(fig_ataques, use_container_width=True)
 
-        fig_evolucion.update_traces(
-            mode='lines+markers', line_shape='linear',
-            marker=dict(symbol='square', size=10, color='#1f77b4', line=dict(width=1, color='white')),
-            line=dict(width=3, color='#1f77b4'),
-            textposition="top center"
-        )
+        col1, col2 = st.columns(2)
 
-        fig_evolucion.update_layout(
-            xaxis=dict(showgrid=True, gridcolor='lightgrey', rangeslider=dict(visible=True), type='category'),
-            yaxis=dict(showgrid=True, gridcolor='lightgrey', range=[0, df_h['Ataques_Detectados'].max() + 5]),
-            plot_bgcolor='rgba(240,240,240,0.5)', height=500
-        )
+        with col1:
+            # --- 2. TENDENCIA DE PUERTOS CRÍTICOS ---
+            st.subheader("🔑 Puertos más Atacados")
+            # Agrupamos para ver qué puertos son tendencia
+            fig_puertos = px.line(df_h, x='Fecha', y='Ataques_Detectados', color='Puerto_Critico', 
+                                  markers=True, title="Foco de Ataque por Puerto")
+            st.plotly_chart(fig_puertos, use_container_width=True)
 
-        st.plotly_chart(fig_evolucion, use_container_width=True)
-        
+        with col2:
+            # --- 3. RENDIMIENTO DE LA IA (Para el Cap 4) ---
+            st.subheader("🎯 Precisión del Sistema (IA)")
+            fig_metricas = px.line(df_h, x='Fecha', y='Accuracy', markers=True, 
+                                   title="Estabilidad del Modelo CNN")
+            fig_metricas.update_traces(line_color='#2ecc71')
+            st.plotly_chart(fig_metricas, use_container_width=True)
+
+        # --- 4. TABLA DE DATOS Y DESCARGA ---
         st.divider()
-        st.subheader("📋 Registros Históricos")
-        
-        # Lista de columnas que QUEREMOS mostrar
-        cols_deseadas = ['Fecha', 'Archivo', 'Total_Registros', 'Ataques_Detectados', 'Puerto_Critico']
-        
-        # Filtramos solo las que DE VERDAD existen en el archivo para evitar el KeyError
-        cols_reales = [c for c in cols_deseadas if c in df_h.columns]
-        
-        if len(cols_reales) > 0:
-            st.dataframe(df_h[cols_reales], use_container_width=True)
-        else:
-            # Si no encuentra ninguna, muestra todo el dataframe para que veas qué nombres tienen
-            st.write("Mostrando todas las columnas disponibles:")
-            st.dataframe(df_h, use_container_width=True)
+        st.subheader("📋 Bitácora Detallada para Auditoría")
+        st.dataframe(df_h, use_container_width=True)
+
+        # Botón de Descarga
+        csv_data = df_h.to_csv(index=False).encode('utf-8')
+        st.download_button(label="📥 Descargar Reporte para Tesis (CSV)",
+                           data=csv_data,
+                           file_name=f"reporte_ids_2026.csv",
+                           mime='text/csv')
+    else:
+        st.info("Aún no hay datos históricos. Por favor, realiza simulaciones en la pestaña de Monitoreo.")
