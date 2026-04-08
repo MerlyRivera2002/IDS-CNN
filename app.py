@@ -199,39 +199,47 @@ with tab1:
                         rec = recall_score(y_true, preds_totales, zero_division=0)
                         f1 = f1_score(y_true, preds_totales, zero_division=0)
                         
-                        # --- GRÁFICO DE LÍNEAS MÚLTIPLES (estilo imagen) ---
+                        # --- GRÁFICO DE LÍNEAS MÚLTIPLES ---
                         st.write("**📊 Evaluación de parámetros del modelo CNN**")
-                        # Crear dataframe con las métricas y sus valores
                         df_line = pd.DataFrame({
                             'Parámetro': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
                             'Valor (%)': [acc*100, prec*100, rec*100, f1*100]
                         })
-                        # Gráfico de líneas con marcadores
                         fig_line = px.line(
-                            df_line, 
-                            x='Parámetro', 
-                            y='Valor (%)', 
-                            markers=True,
+                            df_line, x='Parámetro', y='Valor (%)', markers=True,
                             text=df_line['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
                             title="Rendimiento del modelo (clasificación binaria)",
                             line_shape='linear'
                         )
-                        # Personalizar estilo
                         fig_line.update_traces(
-                            line_color='#e74c3c',      # Línea roja
-                            line_width=2.5,
+                            line_color='#e74c3c', line_width=2.5,
                             marker=dict(size=12, symbol='circle', color='#2980b9', line=dict(width=1, color='white')),
-                            textposition='top center',
-                            textfont_size=12
+                            textposition='top center', textfont_size=12
                         )
                         fig_line.update_layout(
                             yaxis=dict(title="Porcentaje (%)", range=[0, 100], gridcolor='lightgray', showgrid=True),
-                            xaxis_title="",
-                            plot_bgcolor='white',
-                            font=dict(size=13),
-                            margin=dict(t=50, b=30)
+                            xaxis_title="", plot_bgcolor='white', font=dict(size=13), margin=dict(t=50, b=30)
                         )
                         st.plotly_chart(fig_line, use_container_width=True)
+                        
+                        # --- MATRIZ DE CONFUSIÓN ---
+                        st.write("**📊 Matriz de Confusión del modelo**")
+                        cm = confusion_matrix(y_true, preds_totales)
+                        # Crear matriz con plotly
+                        fig_cm = px.imshow(
+                            cm,
+                            text_auto=True,
+                            x=['Pred: Normal', 'Pred: Ataque'],
+                            y=['Real: Normal', 'Real: Ataque'],
+                            color_continuous_scale='Blues',
+                            title="Matriz de Confusión (Normal vs Ataque)"
+                        )
+                        fig_cm.update_layout(
+                            xaxis_title="Predicción",
+                            yaxis_title="Valor Real",
+                            font=dict(size=12)
+                        )
+                        st.plotly_chart(fig_cm, use_container_width=True)
                         # -------------------------------------------------
                         
                         p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
