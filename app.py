@@ -152,63 +152,53 @@ with tab1:
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
-
-# ----------------------------------------- PESTAÑA 2 (ANÁLISIS HISTÓRICO) ---------------------------------------
+# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        # 1. GRÁFICAS DE TENDENCIA (MISMO ESTILO QUE TU FOTO)
-        st.subheader("📈 Análisis de Tendencias Temporales")
-        
+        # TENDENCIAS (Mismo gráfico de la foto para ambos)
         col_g1, col_g2 = st.columns(2)
         
         with col_g1:
-            st.write("**Evolución de Intrusiones**")
-            fig1 = px.line(df_h, x='Fecha', y='Ataques_Detectados', markers=True,
-                          title="Capturas de Ataques por Sesión",
-                          labels={'Ataques_Detectados': 'Cant. Ataques'})
-            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10, symbol='circle'))
+            st.subheader("📈 Tendencia de Ataques")
+            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, 
+                          title="Capturas de Intrusiones por Fecha")
+            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10)) # Rojo para ataques
             st.plotly_chart(fig1, use_container_width=True)
             
         with col_g2:
-            st.write("**Comportamiento de Puertos**")
-            # Convertimos el puerto a string para que el gráfico lo trate como categoría
-            fig2 = px.line(df_h, x='Fecha', y='Puerto_Critico', markers=True,
-                          title="Puertos con Mayor Actividad Maliciosa",
-                          labels={'Puerto_Critico': 'Puerto Detectado'})
-            fig2.update_traces(line_color='#3498db', marker=dict(size=10, symbol='square'))
+            st.subheader("📈 Tendencia de Puertos")
+            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True,
+                          title="Puertos Críticos Detectados")
+            fig2.update_traces(line_color='#3498db', marker=dict(size=10)) # Azul para puertos
             st.plotly_chart(fig2, use_container_width=True)
 
         st.divider()
 
-        # 2. TABLA MAESTRA PARA CAPÍTULO 4
-        st.subheader("📋 Matriz de Datos para Toma de Decisiones")
-        st.write("Esta tabla contiene la referencia técnica necesaria para el análisis de resultados.")
+        # TABLA MAESTRA CAP 4
+        st.subheader("📋 Matriz de Referencia Técnica (Capítulo 4)")
+        st.write("Datos consolidados para el análisis de resultados y toma de decisiones.")
         
-        # Ajustamos los nombres de las columnas para que se vean bien en la tesis
-        tabla_tesis = df_h.copy()
-        tabla_tesis.columns = ['Fecha', 'Dataset Fuente', 'Total Registros', 'Ataques', 'Puerto Crítico', 'Tiempo (seg)', 'Accuracy (%)']
-        
-        st.dataframe(tabla_tesis.style.highlight_max(axis=0, subset=['Ataques'], color='#ffd1d1'), use_container_width=True)
+        # Formatear Accuracy como porcentaje para que se vea pro
+        df_mostrar = df_h.copy()
+        if 'Accuracy' in df_mostrar.columns:
+            df_mostrar['Accuracy'] = df_mostrar['Accuracy'].apply(lambda x: f"{x:.2%}")
+            
+        st.dataframe(df_mostrar, use_container_width=True)
 
-        # 3. GENERADOR DE CONCLUSIONES (AUXILIAR CAP 4)
-        st.divider()
-        st.subheader("💡 Sugerencias para Conclusiones (Toma de Decisiones)")
-        
-        puerto_mas_frecuente = df_h['Puerto_Critico'].mode()[0]
-        total_historico = df_h['Ataques_Detectados'].sum()
-        
+        # SECCIÓN DE TOMA DE DECISIONES
+        st.subheader("💡 Análisis para Toma de Decisiones")
+        p_frecuente = df_h['Puerto'].mode()[0]
         st.info(f"""
-        **Análisis Automático:**
-        * Se han detectado un total de **{total_historico}** amenazas en el periodo evaluado.
-        * El **{puerto_mas_frecuente}** presenta la mayor recurrencia de ataques, lo que sugiere la necesidad de implementar reglas de filtrado específicas en el Firewall.
-        * La estabilidad en la tendencia de Accuracy demuestra que el modelo CNN mantiene un rendimiento sólido ante diferentes datasets de la familia ISCX.
+        **Sugerencias automáticas para tu tesis:**
+        1. **Filtro de Red:** Se recomienda priorizar el monitoreo en el **{p_frecuente}** debido a su alta recurrencia de anomalías.
+        2. **Rendimiento:** El modelo mantiene un Accuracy promedio del **{df_h['Accuracy'].mean():.2%}**, validando la arquitectura CNN para este entorno.
         """)
         
-        if st.button("🗑️ Limpiar Bitácora"):
+        if st.button("🗑️ Resetear Todo el Historial"):
             os.remove("historial.csv"); st.rerun()
     else:
-        st.info("No hay datos suficientes para generar tendencias. Realiza simulaciones en la Pestaña 1.")
+        st.info("No hay datos históricos. Realiza una simulación en la Pestaña 1.")
 
