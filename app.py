@@ -159,5 +159,82 @@ with tab1:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 with tab2:
-    st.info("Pestaña en espera de configuración...")
+    st.header("📊 Inteligencia de Red y Toma de Decisiones")
+    
+    df_h = logic.obtener_metricas_resumen("historial.csv")
+    
+    if df_h is not None and not df_h.empty:
+        # 1. GRÁFICAS DE TENDENCIA (Estilo de la imagen adjunta)
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            st.subheader("📈 Tendencia de Ataques")
+            # Recreando el estilo de tu imagen: línea con marcadores cuadrados/circulares
+            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, 
+                           title="Evolución Temporal de Capturas (Ataques)")
+            fig1.update_traces(line_color='#00558c', marker=dict(size=10, symbol='square'))
+            fig1.update_layout(xaxis_title="Mes / Fecha", yaxis_title="Cantidad de Ataques")
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col_g2:
+            st.subheader("📡 Tendencia por Puertos")
+            # Mostramos cómo varían los puertos atacados en el tiempo
+            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True, 
+                           title="Puertos Críticos Identificados")
+            fig2.update_traces(line_color='#2c3e50', marker=dict(size=10, symbol='circle'))
+            st.plotly_chart(fig2, use_container_width=True)
+
+        st.divider()
+
+        # 2. TABLA MAESTRA (Matriz para Capítulo 4)
+        st.subheader("📋 Matriz de Datos y Métricas de Rendimiento")
+        st.write("Esta tabla consolida los resultados de las simulaciones para el análisis de eficiencia del modelo CNN.")
+        
+        df_ver = df_h.copy()
+        # Formatear Accuracy para que se vea como porcentaje en la tabla
+        if 'Accuracy' in df_ver.columns:
+            df_ver['Accuracy'] = df_ver['Accuracy'].apply(lambda x: f"{x:.2%}")
+        
+        # Mostramos la tabla con todas las métricas solicitadas
+        st.dataframe(df_ver[['Fecha', 'Dataset', 'Total', 'Normales', 'Ataques', 'Puerto', 'Accuracy']], 
+                     use_container_width=True)
+
+        # 3. SECCIÓN DE REPORTES Y TOMA DE DECISIONES
+        st.subheader("💡 Reporte para Toma de Decisiones (Soporte Cap. 4)")
+        
+        # Cálculos para el reporte
+        puerto_recurrente = df_h['Puerto'].mode()[0]
+        max_ataques = df_h['Ataques'].max()
+        acc_promedio = df_h['Accuracy'].mean()
+        
+        col_rep, col_btn = st.columns([3, 1])
+        
+        with col_rep:
+            st.info(f"""
+            **Análisis de Seguridad Basado en el Historial:**
+            * **Vulnerabilidad Principal:** Se detecta actividad inusual recurrente en el **{puerto_recurrente}**.
+            * **Pico de Amenazas:** El nivel máximo de intrusiones registrado en una sesión es de **{max_ataques}**.
+            * **Confiabilidad del Modelo:** La arquitectura CNN mantiene una precisión media del **{acc_promedio:.2%}**.
+            
+            **Recomendación Técnica:** Implementar políticas de filtrado (Drop) en el firewall perimetral para el tráfico dirigido al {puerto_recurrente} y re-entrenar el modelo si el Accuracy baja del 85%.
+            """)
+        
+        with col_btn:
+            # Botón para descargar los datos en CSV para tu Excel de la tesis
+            csv = df_h.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Descargar Reporte CSV",
+                data=csv,
+                file_name='reporte_tesis_ids.csv',
+                mime='text/csv',
+            )
+            
+            if st.button("🗑️ Resetear Historial"):
+                if os.path.exists("historial.csv"):
+                    os.remove("historial.csv")
+                    st.rerun()
+
+    else:
+        st.warning("⚠️ No hay datos en la bitácora. Realiza un monitoreo en la Pestaña 1 para generar estadísticas.")
