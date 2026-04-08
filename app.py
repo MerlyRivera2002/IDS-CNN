@@ -163,7 +163,15 @@ with tab1:
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
     
+    # --- BOTÓN DE EMERGENCIA PARA TESTEO ---
+    if st.button("🛠️ FORZAR DATOS DE PRUEBA"):
+        logic.guardar_en_historial("historial.csv", "test_pcap.csv", 500, 150, 10.5, "2026-04-01", 80, 0.98)
+        st.success("Dato insertado. Ahora recarga la página.")
+        st.rerun()
+    # ---------------------------------------
+
     df_h = logic.obtener_metricas_resumen("historial.csv")
+    # ... (todo el código de gráficas que ya tienes)
     
     if df_h is not None and not df_h.empty:
         # --- SOLUCIÓN AL KEYERROR: Asegurar que existan todas las columnas ---
