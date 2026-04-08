@@ -259,14 +259,48 @@ with tab2:
 
         st.divider()
 
-        # --- Reporte descargable ---
-        st.subheader("📥 Exportar Reporte Completo")
-        csv_buffer = io.StringIO()
-        df_h.to_csv(csv_buffer, index=False)
+        # --- REPORTES CON FILTRO POR FECHA ---
+        st.subheader("📥 Exportar Reporte por Rango de Fechas")
+
+        # Obtener fechas mínima y máxima del historial
+        min_fecha = df_h['Fecha'].min().date()
+        max_fecha = df_h['Fecha'].max().date()
+
+        col_fecha1, col_fecha2 = st.columns(2)
+        with col_fecha1:
+            fecha_inicio = st.date_input("Fecha de inicio", value=min_fecha, min_value=min_fecha, max_value=max_fecha)
+        with col_fecha2:
+            fecha_fin = st.date_input("Fecha de fin", value=max_fecha, min_value=min_fecha, max_value=max_fecha)
+
+        # Filtrar dataframe por rango de fechas
+        mask = (df_h['Fecha'].dt.date >= fecha_inicio) & (df_h['Fecha'].dt.date <= fecha_fin)
+        df_filtrado = df_h.loc[mask].copy()
+
+        if df_filtrado.empty:
+            st.warning("No hay registros en el rango de fechas seleccionado.")
+        else:
+            st.success(f"Se encontraron {len(df_filtrado)} registros entre {fecha_inicio} y {fecha_fin}.")
+            # Botón de descarga para el filtro
+            csv_buffer_filtrado = io.StringIO()
+            df_filtrado.to_csv(csv_buffer_filtrado, index=False)
+            st.download_button(
+                label=f"📎 Descargar Reporte ({fecha_inicio} a {fecha_fin})",
+                data=csv_buffer_filtrado.getvalue(),
+                file_name=f"reporte_{fecha_inicio}_{fecha_fin}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+        st.divider()
+
+        # --- DESCARGA GENERAL (todo el historial) ---
+        st.subheader("📥 Exportar Reporte General (Completo)")
+        csv_buffer_general = io.StringIO()
+        df_h.to_csv(csv_buffer_general, index=False)
         st.download_button(
-            label="📎 Descargar Historial en CSV",
-            data=csv_buffer.getvalue(),
-            file_name="reporte_deteccion_intrusos.csv",
+            label="📎 Descargar Historial Completo",
+            data=csv_buffer_general.getvalue(),
+            file_name="reporte_completo_historial.csv",
             mime="text/csv",
             use_container_width=True
         )
