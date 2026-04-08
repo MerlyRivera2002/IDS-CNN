@@ -8,7 +8,7 @@ import streamlit as st
 # ==================================================
 # CONFIGURACIÓN DE GITHUB - ¡CAMBIA ESTOS VALORES!
 # ==================================================
-REPO_OWNER = "TU_USUARIO_GITHUB"   # Ejemplo: "juanperez"
+REPO_OWNER = "MerlyRivera2002"   # Ejemplo: "juanperez"
 REPO_NAME = "https://github.com/MerlyRivera2002/IDS-CNN"       # Ejemplo: "ids-tesis"
 FILE_PATH = "historial.csv"        # Nombre del archivo en el repo
 
