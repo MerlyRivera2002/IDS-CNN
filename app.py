@@ -153,49 +153,49 @@ with tab1:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+
 with tab2:
     st.header("📊 Inteligencia de Amenazas y Reportes")
     
     if os.path.exists("historial.csv"):
         df_h = pd.read_csv("historial.csv")
+        
+        # 🛠️ VALIDACIÓN: Si el archivo es viejo y no tiene Accuracy, le ponemos 0 para que no explote
+        if 'Accuracy' not in df_h.columns:
+            df_h['Accuracy'] = 0.0 
+        
         df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
         df_h = df_h.sort_values('Fecha_Dt')
 
-        # --- 1. TENDENCIA GLOBAL (Líneas con puntitos) ---
+        # --- 1. TENDENCIA GLOBAL ---
         st.subheader("📈 Comportamiento Diario de Intrusiones")
         fig_ataques = px.line(df_h, x='Fecha', y='Ataques_Detectados', markers=True,
-                              text='Ataques_Detectados', title="Evolución de Amenazas por Día")
+                              text='Ataques_Detectados')
         fig_ataques.update_traces(line_color='#1f77b4', marker=dict(symbol='square', size=10))
         st.plotly_chart(fig_ataques, use_container_width=True)
 
         col1, col2 = st.columns(2)
 
         with col1:
-            # --- 2. TENDENCIA DE PUERTOS CRÍTICOS ---
+            # --- 2. TENDENCIA DE PUERTOS ---
             st.subheader("🔑 Puertos más Atacados")
-            # Agrupamos para ver qué puertos son tendencia
-            fig_puertos = px.line(df_h, x='Fecha', y='Ataques_Detectados', color='Puerto_Critico', 
-                                  markers=True, title="Foco de Ataque por Puerto")
-            st.plotly_chart(fig_puertos, use_container_width=True)
+            if 'Puerto_Critico' in df_h.columns:
+                fig_puertos = px.line(df_h, x='Fecha', y='Ataques_Detectados', color='Puerto_Critico', 
+                                      markers=True)
+                st.plotly_chart(fig_puertos, use_container_width=True)
+            else:
+                st.warning("Datos de puertos no disponibles en registros antiguos.")
 
         with col2:
-            # --- 3. RENDIMIENTO DE LA IA (Para el Cap 4) ---
+            # --- 3. RENDIMIENTO DE LA IA ---
             st.subheader("🎯 Precisión del Sistema (IA)")
-            fig_metricas = px.line(df_h, x='Fecha', y='Accuracy', markers=True, 
-                                   title="Estabilidad del Modelo CNN")
-            fig_metricas.update_traces(line_color='#2ecc71')
+            fig_metricas = px.line(df_h, x='Fecha', y='Accuracy', markers=True)
+            fig_metricas.update_traces(line_color='#2ecc71', marker=dict(symbol='circle', size=10))
             st.plotly_chart(fig_metricas, use_container_width=True)
 
-        # --- 4. TABLA DE DATOS Y DESCARGA ---
+        # --- 4. TABLA Y DESCARGA ---
         st.divider()
-        st.subheader("📋 Bitácora Detallada para Auditoría")
         st.dataframe(df_h, use_container_width=True)
-
-        # Botón de Descarga
+        
         csv_data = df_h.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Descargar Reporte para Tesis (CSV)",
-                           data=csv_data,
-                           file_name=f"reporte_ids_2026.csv",
-                           mime='text/csv')
-    else:
-        st.info("Aún no hay datos históricos. Por favor, realiza simulaciones en la pestaña de Monitoreo.")
+        st.download_button("📥 Descargar Reporte CSV", csv_data, "reporte_ids.csv", "text/csv")
