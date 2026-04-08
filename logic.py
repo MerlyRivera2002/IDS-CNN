@@ -25,8 +25,11 @@ def obtener_metricas_resumen(archivo_hist):
         try:
             df = pd.read_csv(archivo_hist)
             if not df.empty:
+                # Convertimos fecha y aseguramos que Accuracy sea numérico
                 df['Fecha'] = pd.to_datetime(df['Fecha'])
+                if 'Accuracy' in df.columns:
+                    df['Accuracy'] = pd.to_numeric(df['Accuracy'], errors='coerce')
                 return df.sort_values('Fecha')
-        except:
+        except Exception:
             return None
     return None
