@@ -174,29 +174,60 @@ with tab2:
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        # Aseguramos columnas para la tabla
-        if 'Normales' not in df_h.columns:
-            df_h['Normales'] = df_h['Total'] - df_h['Ataques']
-            
-        # 1. GRÁFICA DE TENDENCIA
-        st.subheader("📈 Tendencia de Ataques")
-        fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True)
-        fig1.update_traces(line_color='#00558c', marker=dict(size=10, symbol='square'))
-        st.plotly_chart(fig1, use_container_width=True)
-            
+        # 1. TENDENCIAS (Lo que ya tenías)
+        st.subheader("📈 Tendencias del Sistema")
+        c1, c2 = st.columns(2)
+        with c1:
+            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, title="Evolución de Intrusiones")
+            fig1.update_traces(line_color='#00558c', marker=dict(size=10, symbol='square'))
+            st.plotly_chart(fig1, use_container_width=True)
+        with c2:
+            fig_puertos = px.line(df_h, x='Fecha', y='Puerto', markers=True, title="Puerto Objetivo Principal")
+            fig_puertos.update_traces(line_color='#f39c12', marker=dict(size=10, symbol='diamond'))
+            fig_puertos.update_layout(yaxis=dict(type='category')) 
+            st.plotly_chart(fig_puertos, use_container_width=True)
+        
         st.divider()
 
-        # 2. TABLA MAESTRA
+        # --- NUEVA SECCIÓN: DISTRIBUCIÓN POR TIPO DE TRÁFICO ---
+        st.subheader("🔍 Análisis de Puertos por Tipo de Tráfico")
+        st.write("Comparativa de los puertos más frecuentes detectados en todas las simulaciones.")
+
+        # Agrupamos datos para ver el volumen por puerto
+        # (Asumiendo que df_h tiene los datos acumulados)
+        col_p1, col_p2 = st.columns(2)
+
+        with col_p1:
+            st.write("**Puertos en Tráfico Seguro (✅)**")
+            # Simulamos una distribución basada en el historial para la visualización
+            fig_normal = px.bar(df_h, x='Puerto', y='Total', # O la métrica que prefieras de volumen
+                              title="Frecuencia: Tráfico Normal",
+                              color_discrete_sequence=['#2ecc71'])
+            fig_normal.update_layout(xaxis_title="Puerto", yaxis_title="Cantidad")
+            st.plotly_chart(fig_normal, use_container_width=True)
+
+        with col_p2:
+            st.write("**Puertos en Tráfico Malicioso (🚨)**")
+            fig_atq = px.bar(df_h, x='Puerto', y='Ataques', 
+                           title="Frecuencia: Intrusiones",
+                           color_discrete_sequence=['#e74c3c'])
+            fig_atq.update_layout(xaxis_title="Puerto", yaxis_title="Cantidad")
+            st.plotly_chart(fig_atq, use_container_width=True)
+        
+        st.divider()
+
+        # 2. TABLA MAESTRA (TU TABLA BACÁN)
         st.subheader("📋 Matriz de Datos (Capítulo 4)")
         df_ver = df_h.copy()
         if 'Accuracy' in df_ver.columns:
-            df_ver['Accuracy'] = df_ver['Accuracy'].apply(lambda x: f"{float(x):.2%}")
+            df_ver['Accuracy'] = df_ver['Accuracy'].fillna(0).apply(lambda x: f"{float(x):.2%}")
         
-        st.dataframe(df_ver[['Fecha', 'Dataset', 'Total', 'Normales', 'Ataques', 'Puerto', 'Accuracy']], use_container_width=True)
+        st.dataframe(df_ver[['Fecha', 'Dataset', 'Total', 'Ataques', 'Puerto', 'Accuracy']], use_container_width=True)
 
         # 3. ACCIONES
         if st.button("🗑️ Borrar Historial"):
-            if os.path.exists("historial.csv"): os.remove("historial.csv")
-            st.rerun()
+            if os.path.exists("historial.csv"): 
+                os.remove("historial.csv")
+                st.rerun()
     else:
         st.info("No hay datos históricos. Por favor, realiza una simulación en la Pestaña 1.")
