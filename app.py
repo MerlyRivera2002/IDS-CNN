@@ -201,6 +201,7 @@ with tab1:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
 
@@ -247,7 +248,6 @@ with tab2:
         st.subheader("📋 Registro Detallado de Simulaciones")
         columnas_mostrar = ['Fecha', 'Dataset', 'Total', 'Normales', 'Ataques',
                             'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
-        # Aseguramos que existan las columnas
         for col in columnas_mostrar:
             if col not in df_h.columns:
                 df_h[col] = np.nan
@@ -259,33 +259,32 @@ with tab2:
 
         st.divider()
 
-        # --- REPORTES CON FILTRO POR FECHA ---
+        # --- REPORTES CON FILTRO POR FECHA (VERSIÓN ÚNICA Y CORRECTA) ---
         st.subheader("📥 Exportar Reporte por Rango de Fechas")
 
-        # Obtener fechas mínima y máxima del historial
+        # Asegurar que la columna Fecha es datetime
+        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
         min_fecha = df_h['Fecha'].min().date()
         max_fecha = df_h['Fecha'].max().date()
 
         col_fecha1, col_fecha2 = st.columns(2)
         with col_fecha1:
-            fecha_inicio = st.date_input("Fecha de inicio", value=min_fecha, min_value=min_fecha, max_value=max_fecha)
+            fecha_inicio = st.date_input("📅 Fecha de inicio", value=min_fecha, min_value=min_fecha, max_value=max_fecha)
         with col_fecha2:
-            fecha_fin = st.date_input("Fecha de fin", value=max_fecha, min_value=min_fecha, max_value=max_fecha)
+            fecha_fin = st.date_input("📅 Fecha de fin", value=max_fecha, min_value=min_fecha, max_value=max_fecha)
 
-        # Filtrar dataframe por rango de fechas
         mask = (df_h['Fecha'].dt.date >= fecha_inicio) & (df_h['Fecha'].dt.date <= fecha_fin)
         df_filtrado = df_h.loc[mask].copy()
 
         if df_filtrado.empty:
-            st.warning("No hay registros en el rango de fechas seleccionado.")
+            st.warning("⚠️ No hay registros en el rango de fechas seleccionado.")
         else:
-            st.success(f"Se encontraron {len(df_filtrado)} registros entre {fecha_inicio} y {fecha_fin}.")
-            # Botón de descarga para el filtro
-            csv_buffer_filtrado = io.StringIO()
-            df_filtrado.to_csv(csv_buffer_filtrado, index=False)
+            st.success(f"✅ {len(df_filtrado)} registros encontrados entre {fecha_inicio} y {fecha_fin}.")
+            csv_buffer = io.StringIO()
+            df_filtrado.to_csv(csv_buffer, index=False)
             st.download_button(
-                label=f"📎 Descargar Reporte ({fecha_inicio} a {fecha_fin})",
-                data=csv_buffer_filtrado.getvalue(),
+                label=f"📎 Descargar reporte ({fecha_inicio} a {fecha_fin})",
+                data=csv_buffer.getvalue(),
                 file_name=f"reporte_{fecha_inicio}_{fecha_fin}.csv",
                 mime="text/csv",
                 use_container_width=True
@@ -293,41 +292,7 @@ with tab2:
 
         st.divider()
 
-        # --- DESCARGA GENERAL (todo el historial) ---
-st.subheader("📥 Exportar Reporte por Rango de Fechas")
-
-# Obtener fechas mínima y máxima del historial
-min_fecha = df_h['Fecha'].min().date()
-max_fecha = df_h['Fecha'].max().date()
-
-# Selectores de fechas (por defecto, el rango completo)
-col_fecha1, col_fecha2 = st.columns(2)
-with col_fecha1:
-    fecha_inicio = st.date_input("📅 Fecha de inicio", value=min_fecha, min_value=min_fecha, max_value=max_fecha)
-with col_fecha2:
-    fecha_fin = st.date_input("📅 Fecha de fin", value=max_fecha, min_value=min_fecha, max_value=max_fecha)
-
-# Filtrar dataframe por rango de fechas
-mask = (df_h['Fecha'].dt.date >= fecha_inicio) & (df_h['Fecha'].dt.date <= fecha_fin)
-df_filtrado = df_h.loc[mask].copy()
-
-if df_filtrado.empty:
-    st.warning("⚠️ No hay registros en el rango de fechas seleccionado.")
-else:
-    st.success(f"✅ {len(df_filtrado)} registros encontrados entre el {fecha_inicio} y el {fecha_fin}.")
-    
-    # Preparar CSV para descargar
-    csv_buffer = io.StringIO()
-    df_filtrado.to_csv(csv_buffer, index=False)
-    
-    st.download_button(
-        label=f"📎 Descargar reporte ({fecha_inicio} a {fecha_fin})",
-        data=csv_buffer.getvalue(),
-        file_name=f"reporte_{fecha_inicio}_{fecha_fin}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-        # --- Botón borrar historial ---
+        # --- BOTÓN BORRAR HISTORIAL ---
         if st.button("🗑️ Borrar Todo el Historial", type="secondary"):
             if os.path.exists("historial.csv"):
                 os.remove("historial.csv")
