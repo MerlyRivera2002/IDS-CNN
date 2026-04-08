@@ -265,10 +265,13 @@ with tab1:
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
 
+       import os
     if os.path.exists("historial.csv"):
-    st.success("✅ El archivo EXISTE en el servidor")
-else:
-    st.error("❌ El archivo NO EXISTE en el servidor")
+        st.success("✅ El archivo EXISTE en el servidor")
+        # Opcional: mostrar el tamaño
+        st.write(f"Tamaño: {os.path.getsize('historial.csv')} bytes")
+    else:
+        st.error("❌ El archivo NO EXISTE en el servidor")
     import requests, base64, io
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     # Configura aquí tus datos de GitHub (los mismos que usas en logic.py)
