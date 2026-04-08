@@ -12,7 +12,7 @@ import logic
 
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- LOGIN ---
+# --- LOGIN (Tu lógica original) ---
 if 'perfil' not in st.session_state: st.session_state.perfil = None
 
 st.sidebar.title("🔐 Control de Acceso")
@@ -33,11 +33,9 @@ else:
     st.sidebar.divider()
     st.sidebar.subheader("📅 Simulación de Tiempo")
     fecha_simulada = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
-    
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.clear(); st.rerun()
 
-# Carga de activos
 @st.cache_resource
 def load_assets():
     return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
@@ -46,7 +44,7 @@ model, scaler, features_list = load_assets()
 
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# ----------------------------------------- PESTAÑA 1 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 1 (TUYA) ---------------------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -90,7 +88,6 @@ with tab1:
                     with espacio_tabla.container():
                         vista = chunk.copy()
                         vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
-                        
                         def sugerir_amenaza(row):
                             if "NORMAL" in row['Estado']: return "Tráfico Seguro"
                             p = row['Destination Port']
@@ -98,7 +95,6 @@ with tab1:
                             if p == 22: return "Fuerza Bruta (SSH)"
                             if p == 21: return "Acceso FTP"
                             return "Escaneo / Port Scan"
-                        
                         vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
                         st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
                     time.sleep(0.08)
@@ -106,45 +102,47 @@ with tab1:
                 st.success("✅ Simulación finalizada.")
                 st.divider()
 
-                # MÉTRICAS FINALES
-                st.subheader("📊 Evaluación del Rendimiento (Final)")
-                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
-                
-                if col_label:
+                if col_label := next((c for c in df_clean.columns if c.lower() == 'label'), None):
                     y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)[:len(preds_totales)]
-                    acc = accuracy_score(y_true, preds_totales)
-                    prec = precision_score(y_true, preds_totales, zero_division=0)
-                    rec = recall_score(y_true, preds_totales, zero_division=0)
-                    f1 = f1_score(y_true, preds_totales, zero_division=0)
+                    st.subheader("📊 Evaluación Final")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.write("Matriz de Confusión")
+                        st.plotly_chart(px.imshow(confusion_matrix(y_true, preds_totales), text_auto=True, color_continuous_scale='Reds'), use_container_width=True)
+                    with c2:
+                        acc = accuracy_score(y_true, preds_totales)
+                        st.metric("ACCURACY DEL MODELO", f"{acc:.2%}")
 
-                    c_mat, c_line = st.columns([1, 1])
-                    with c_mat:
-                        st.write("**Matriz de Confusión**")
-                        cm = confusion_matrix(y_true, preds_totales)
-                        fig_cm = px.imshow(cm, text_auto=True, x=['Pred: Norm', 'Pred: Atq'], y=['Real: Norm', 'Real: Atq'], color_continuous_scale='Reds')
-                        st.plotly_chart(fig_cm, use_container_width=True)
-                    
-                    with c_line:
-                        st.write("**Gráfico de Rendimiento (Scores)**")
-                        df_m = pd.DataFrame({'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'], 'Valor': [acc, prec, rec, f1]})
-                        fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True, text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
-                        fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
-                        st.plotly_chart(fig_m, use_container_width=True)
-                
-                # GUARDAR EN HISTORIAL
+                # LLAMADA AL LOGIC
                 p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
                 logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top)
     else:
-        st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
+        st.warning("🔒 Acceso solo Admin.")
 
-# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 2 (ANÁLISIS) -----------------------------------------------
 with tab2:
-    st.header("📊 Bitácora y Análisis Histórico")
+    st.header("📊 Inteligencia de Amenazas y Reportes Históricos")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
-    if df_h is not None:
-        # Aquí empezaremos a construir los reportes (Gráficas de barras por fecha, etc.)
-        st.write("Datos cargados correctamente. ¿Qué gráfica quieres poner primero?")
+    if df_h is not None and not df_h.empty:
+        # --- 1. GRÁFICO DE BARRAS: ATAQUES POR DÍA ---
+        st.subheader("📅 Tendencia de Intrusiones por Fecha")
+        fig_barras = px.bar(
+            df_h, 
+            x='Fecha', 
+            y='Ataques_Detectados', 
+            color='Puerto_Critico',
+            title="Ataques Totales por Día (Color por Puerto más atacado)",
+            text_auto=True
+        )
+        st.plotly_chart(fig_barras, use_container_width=True)
+
+        # --- 2. TABLA DE BITÁCORA ---
+        st.divider()
+        st.subheader("📋 Historial Detallado")
         st.dataframe(df_h, use_container_width=True)
+        
+        if st.button("🗑️ Resetear Base de Datos"):
+            os.remove("historial.csv"); st.rerun()
     else:
-        st.info("Aún no hay datos registrados. Realiza una simulación en la Pestaña 1.")
+        st.info("No hay datos registrados aún. Realiza una simulación en la Pestaña 1.")
