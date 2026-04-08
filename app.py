@@ -51,7 +51,7 @@ model, scaler, features_list = load_assets()
 
 # Crear las 3 pestañas
 tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 MOVIMIENTOS Y REPORTES"])
- -------------------------------------------pestaña 1-------------------------------------------
+#-------------------------------------------pestaña 1-------------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
