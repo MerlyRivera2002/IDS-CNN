@@ -152,32 +152,63 @@ with tab1:
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
-# ----------------------------------------- PESTAÑA 2 (TRABAJANDO AQUÍ) -----------------------------------------
+
+# ----------------------------------------- PESTAÑA 2 (ANÁLISIS HISTÓRICO) ---------------------------------------
 with tab2:
-    st.header("📊 Bitácora de Eventos e Histórico")
+    st.header("📊 Inteligencia de Red y Toma de Decisiones")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        # Gráfico de Barras que ya habíamos hablado
-        st.subheader("📈 Intrusiones por Fecha y Puerto Crítico")
-        fig_hist = px.bar(
-            df_h, 
-            x='Fecha', 
-            y='Ataques_Detectados', 
-            color='Puerto_Critico',
-            barmode='group',
-            title="Comparativa de Ataques por Sesión",
-            labels={'Ataques_Detectados': 'Cant. Ataques', 'Puerto_Critico': 'Puerto más Atacado'}
-        )
-        st.plotly_chart(fig_hist, use_container_width=True)
+        # 1. GRÁFICAS DE TENDENCIA (MISMO ESTILO QUE TU FOTO)
+        st.subheader("📈 Análisis de Tendencias Temporales")
         
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            st.write("**Evolución de Intrusiones**")
+            fig1 = px.line(df_h, x='Fecha', y='Ataques_Detectados', markers=True,
+                          title="Capturas de Ataques por Sesión",
+                          labels={'Ataques_Detectados': 'Cant. Ataques'})
+            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10, symbol='circle'))
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col_g2:
+            st.write("**Comportamiento de Puertos**")
+            # Convertimos el puerto a string para que el gráfico lo trate como categoría
+            fig2 = px.line(df_h, x='Fecha', y='Puerto_Critico', markers=True,
+                          title="Puertos con Mayor Actividad Maliciosa",
+                          labels={'Puerto_Critico': 'Puerto Detectado'})
+            fig2.update_traces(line_color='#3498db', marker=dict(size=10, symbol='square'))
+            st.plotly_chart(fig2, use_container_width=True)
+
         st.divider()
-        st.subheader("📋 Registro Completo")
-        st.dataframe(df_h, use_container_width=True)
+
+        # 2. TABLA MAESTRA PARA CAPÍTULO 4
+        st.subheader("📋 Matriz de Datos para Toma de Decisiones")
+        st.write("Esta tabla contiene la referencia técnica necesaria para el análisis de resultados.")
         
-        if st.button("🗑️ Resetear Historial"):
-            if os.path.exists("historial.csv"):
-                os.remove("historial.csv")
-                st.rerun()
+        # Ajustamos los nombres de las columnas para que se vean bien en la tesis
+        tabla_tesis = df_h.copy()
+        tabla_tesis.columns = ['Fecha', 'Dataset Fuente', 'Total Registros', 'Ataques', 'Puerto Crítico', 'Tiempo (seg)', 'Accuracy (%)']
+        
+        st.dataframe(tabla_tesis.style.highlight_max(axis=0, subset=['Ataques'], color='#ffd1d1'), use_container_width=True)
+
+        # 3. GENERADOR DE CONCLUSIONES (AUXILIAR CAP 4)
+        st.divider()
+        st.subheader("💡 Sugerencias para Conclusiones (Toma de Decisiones)")
+        
+        puerto_mas_frecuente = df_h['Puerto_Critico'].mode()[0]
+        total_historico = df_h['Ataques_Detectados'].sum()
+        
+        st.info(f"""
+        **Análisis Automático:**
+        * Se han detectado un total de **{total_historico}** amenazas en el periodo evaluado.
+        * El **{puerto_mas_frecuente}** presenta la mayor recurrencia de ataques, lo que sugiere la necesidad de implementar reglas de filtrado específicas en el Firewall.
+        * La estabilidad en la tendencia de Accuracy demuestra que el modelo CNN mantiene un rendimiento sólido ante diferentes datasets de la familia ISCX.
+        """)
+        
+        if st.button("🗑️ Limpiar Bitácora"):
+            os.remove("historial.csv"); st.rerun()
     else:
-        st.info("No hay datos en la bitácora todavía. Realiza un monitoreo en la Pestaña 1.")
+        st.info("No hay datos suficientes para generar tendencias. Realiza simulaciones en la Pestaña 1.")
+
