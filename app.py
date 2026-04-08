@@ -51,10 +51,7 @@ model, scaler, features_list = load_assets()
 
 # Crear las 3 pestañas
 tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 MOVIMIENTOS Y REPORTES"])
-
-# =====================================================================
-# PESTAÑA 1: SIMULACIÓN (igual que antes, pero sin cambios)
-# =====================================================================
+ -------------------------------------------pestaña 1-------------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -201,12 +198,23 @@ with tab1:
                         rec = recall_score(y_true, preds_totales, zero_division=0)
                         f1 = f1_score(y_true, preds_totales, zero_division=0)
                         
-                        st.write("**Métricas de rendimiento del modelo**")
-                        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                        with col_m1: st.metric("Accuracy", f"{acc:.2%}")
-                        with col_m2: st.metric("Precision", f"{prec:.2%}")
-                        with col_m3: st.metric("Recall", f"{rec:.2%}")
-                        with col_m4: st.metric("F1-Score", f"{f1:.2%}")
+                        # --- NUEVO GRÁFICO DE BARRAS PARA MÉTRICAS ---
+                        st.write("**📊 Métricas de rendimiento del modelo CNN**")
+                        df_metricas = pd.DataFrame({
+                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                            'Valor': [acc, prec, rec, f1]
+                        })
+                        # Colores personalizados
+                        colores_metricas = ['#2ecc71', '#e74c3c', '#f39c12', '#3498db']
+                        fig_metricas = px.bar(df_metricas, x='Métrica', y='Valor',
+                                              text=df_metricas['Valor'].apply(lambda x: f"{x:.2%}"),
+                                              color='Métrica', color_discrete_sequence=colores_metricas,
+                                              title="Rendimiento del modelo (clasificación binaria)")
+                        fig_metricas.update_traces(textposition='outside', marker_line_width=1.5)
+                        fig_metricas.update_layout(yaxis=dict(range=[0, 1.1], title="Valor", tickformat=".0%"),
+                                                   xaxis_title="", showlegend=False)
+                        st.plotly_chart(fig_metricas, use_container_width=True)
+                        # ------------------------------------------
                         
                         p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
                         logic.guardar_en_historial(
