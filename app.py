@@ -199,45 +199,39 @@ with tab1:
                         rec = recall_score(y_true, preds_totales, zero_division=0)
                         f1 = f1_score(y_true, preds_totales, zero_division=0)
                         
-                        # --- GRÁFICO DE BARRAS ESTILO PROFESIONAL ---
-                        st.write("**📊 Métricas de rendimiento del modelo CNN**")
-                        df_metricas = pd.DataFrame({
-                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                        # --- GRÁFICO DE LÍNEAS MÚLTIPLES (estilo imagen) ---
+                        st.write("**📊 Evaluación de parámetros del modelo CNN**")
+                        # Crear dataframe con las métricas y sus valores
+                        df_line = pd.DataFrame({
+                            'Parámetro': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
                             'Valor (%)': [acc*100, prec*100, rec*100, f1*100]
                         })
-                        colores_barras = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-                        fig_metricas = px.bar(
-                            df_metricas,
-                            x='Métrica',
-                            y='Valor (%)',
-                            text=df_metricas['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
-                            color='Métrica',
-                            color_discrete_sequence=colores_barras,
-                            title="Rendimiento del modelo (clasificación binaria)"
+                        # Gráfico de líneas con marcadores
+                        fig_line = px.line(
+                            df_line, 
+                            x='Parámetro', 
+                            y='Valor (%)', 
+                            markers=True,
+                            text=df_line['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
+                            title="Rendimiento del modelo (clasificación binaria)",
+                            line_shape='linear'
                         )
-                        fig_metricas.update_traces(
-                            textposition='outside',
-                            textfont_size=12,
-                            marker_line_width=1.5,
-                            marker_line_color='white',
-                            opacity=0.9,
-                            width=0.6
+                        # Personalizar estilo
+                        fig_line.update_traces(
+                            line_color='#e74c3c',      # Línea roja
+                            line_width=2.5,
+                            marker=dict(size=12, symbol='circle', color='#2980b9', line=dict(width=1, color='white')),
+                            textposition='top center',
+                            textfont_size=12
                         )
-                        fig_metricas.update_layout(
-                            yaxis=dict(
-                                title="Porcentaje (%)",
-                                range=[0, max(df_metricas['Valor (%)']) + 10],
-                                gridcolor='lightgray',
-                                gridwidth=0.5,
-                                showgrid=True
-                            ),
+                        fig_line.update_layout(
+                            yaxis=dict(title="Porcentaje (%)", range=[0, 100], gridcolor='lightgray', showgrid=True),
                             xaxis_title="",
                             plot_bgcolor='white',
-                            showlegend=False,
-                            font=dict(size=13, family="Arial"),
+                            font=dict(size=13),
                             margin=dict(t=50, b=30)
                         )
-                        st.plotly_chart(fig_metricas, use_container_width=True)
+                        st.plotly_chart(fig_line, use_container_width=True)
                         # -------------------------------------------------
                         
                         p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
