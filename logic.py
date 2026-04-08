@@ -9,7 +9,7 @@ import streamlit as st
 # CONFIGURACIÓN DE GITHUB - ¡CAMBIA ESTOS VALORES!
 # ==================================================
 REPO_OWNER = "TU_USUARIO_GITHUB"   # Ejemplo: "juanperez"
-REPO_NAME = "TU_REPOSITORIO"       # Ejemplo: "ids-tesis"
+REPO_NAME = "https://github.com/MerlyRivera2002/IDS-CNN"       # Ejemplo: "ids-tesis"
 FILE_PATH = "historial.csv"        # Nombre del archivo en el repo
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc, precision=None, recall=None, f1=None):
