@@ -115,9 +115,12 @@ with tab1:
                 st.success("✅ Simulación finalizada.")
                 st.divider()
 
-                # 3. MÉTRICAS FINALES
+                # 3. MÉTRICAS FINALES Y GUARDADO (CRUCIAL PARA CAP 4)
                 st.subheader("📊 Evaluación del Rendimiento (Final)")
                 col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+                
+                # Inicializamos variables por defecto por seguridad
+                acc, prec, rec, f1 = 0, 0, 0, 0
                 
                 if col_label:
                     y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
@@ -146,9 +149,23 @@ with tab1:
                         fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
                         st.plotly_chart(fig_m, use_container_width=True)
                 
-                # GUARDAR EN HISTORIAL
-                p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
-                logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top)
+                # OBTENER PUERTO CRÍTICO (Usando la función de logic.py)
+                p_top = logic.obtener_puerto_top(df_clean.iloc[:len(preds_totales)], preds_totales)
+                
+                # TIEMPO TOTAL
+                t_total = time.time() - t_inicio
+
+                # GUARDAR EN HISTORIAL (8 argumentos ahora para coincidir con logic.py)
+                logic.guardar_en_historial(
+                    "historial.csv", 
+                    archivo.name, 
+                    len(preds_totales), 
+                    ataques, 
+                    t_total, 
+                    fecha_simulada, # Asegúrate que esta variable venga del sidebar
+                    p_top, 
+                    acc
+                )
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
