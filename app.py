@@ -126,6 +126,57 @@ with tab1:
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
+# 3. MÉTRICAS FINALES (TU DISEÑO ORIGINAL)
+                st.subheader("📊 Evaluación del Rendimiento (Final)")
+                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+                
+                # --- ESTO ASEGURA QUE SIEMPRE HAYA UN VALOR PARA GUARDAR ---
+                acc_final = 0.0 
+                
+                if col_label:
+                    y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
+                    y_true = y_true[:len(preds_totales)]
+                    
+                    acc_final = accuracy_score(y_true, preds_totales)
+                    prec = precision_score(y_true, preds_totales, zero_division=0)
+                    rec = recall_score(y_true, preds_totales, zero_division=0)
+                    f1 = f1_score(y_true, preds_totales, zero_division=0)
+
+                    c_mat, c_line = st.columns([1, 1])
+                    with c_mat:
+                        st.write("**Matriz de Confusión**")
+                        cm = confusion_matrix(y_true, preds_totales)
+                        fig_cm = px.imshow(cm, text_auto=True, x=['Pred: Norm', 'Pred: Atq'], y=['Real: Norm', 'Real: Atq'], color_continuous_scale='Reds')
+                        st.plotly_chart(fig_cm, use_container_width=True)
+                    
+                    with c_line:
+                        st.write("**Gráfico de Rendimiento (Scores)**")
+                        df_m = pd.DataFrame({
+                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+                            'Valor': [acc_final, prec, rec, f1]
+                        })
+                        fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True, text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
+                        # Mantenemos tus colores y símbolos originales
+                        fig_m.update_traces(line_color='#1f77b4', marker=dict(size=12, symbol='square', color='#ff7f0e'))
+                        fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
+                        st.plotly_chart(fig_m, use_container_width=True)
+                
+                # --- GUARDAR EN HISTORIAL (AQUÍ ESTÁ LA CONEXIÓN CORRECTA) ---
+                p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
+                
+                # Pasamos los 8 argumentos que logic.py necesita
+                logic.guardar_en_historial(
+                    "historial.csv", 
+                    archivo.name, 
+                    len(preds_totales), 
+                    ataques, 
+                    (time.time()-t_inicio), 
+                    fecha_simulada, 
+                    p_top, 
+                    acc_final # <--- EL DATO QUE FALTABA
+                )
+                st.success("✅ Simulación finalizada y datos registrados en Bitácora.")
+
 # ----------------------------------------- PESTAÑA 2 (BITÁCORA) -----------------------------------------------------------
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
