@@ -261,17 +261,21 @@ with tab1:
         st.warning("🔒 Solo Administradores.")
 # =====================================================================
 # PESTAÑA 2: ANÁLISIS Y TENDENCIAS (solo KPIs, gráficas históricas, tabla global)
-# =====================================================================
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
-        # KPIs globales
+        # Asegurar orden por fecha
+        df_h = df_h.sort_values('Fecha')
+        
+        # --- KPIs ---
         st.subheader("📌 Resumen global")
         col1, col2, col3, col4 = st.columns(4)
-        with col1: st.metric("Total simulaciones", len(df_h))
-        with col2: st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
+        with col1:
+            st.metric("Total simulaciones", len(df_h))
+        with col2:
+            st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
         with col3:
             avg_acc = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
             st.metric("Precisión promedio", f"{avg_acc:.2%}" if pd.notna(avg_acc) else "N/A")
@@ -281,37 +285,61 @@ with tab2:
         
         st.divider()
         
-        # Gráficas de tendencia
+        # --- Gráficas de tendencia (estilo imagen) ---
         st.subheader("📈 Evolución temporal")
         c1, c2 = st.columns(2)
         with c1:
-            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True,
-                           title="Evolución de intrusiones detectadas",
-                           labels={'Ataques': 'Número de ataques'})
-            fig1.update_traces(line_color='#e74c3c')
+            # Gráfico de líneas con marcadores
+            fig1 = px.line(
+                df_h, x='Fecha', y='Ataques', markers=True,
+                title="Evolución de intrusiones detectadas",
+                labels={'Ataques': 'Número de ataques', 'Fecha': 'Fecha'},
+                line_shape='linear'
+            )
+            fig1.update_traces(
+                line_color='#e74c3c', line_width=2.5,
+                marker=dict(size=10, symbol='square', color='#2980b9', line=dict(width=1, color='white')),
+                textposition='top center', textfont_size=10
+            )
+            fig1.update_traces(text=df_h['Ataques'].apply(lambda x: str(x)), selector=dict(mode='lines+markers+text'))
+            fig1.update_layout(
+                yaxis=dict(title="Ataques", gridcolor='lightgray', showgrid=True),
+                xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
+                plot_bgcolor='white', font=dict(size=12)
+            )
             st.plotly_chart(fig1, use_container_width=True)
+        
         with c2:
-            puertos_hist = df_h['Puerto'].value_counts().head(5).reset_index()
-            puertos_hist.columns = ['Puerto', 'Frecuencia']
-            fig_puertos = px.bar(puertos_hist, x='Puerto', y='Frecuencia',
-                                 title="Top 5 puertos más frecuentes",
-                                 color='Frecuencia', color_continuous_scale='Reds')
+            # Top puertos
+            puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
+            puertos_counts.columns = ['Puerto', 'Frecuencia']
+            fig_puertos = px.bar(
+                puertos_counts, x='Puerto', y='Frecuencia',
+                title="Top 5 puertos más frecuentes",
+                color='Frecuencia', color_continuous_scale='Reds'
+            )
+            fig_puertos.update_layout(
+                xaxis_title="Puerto", yaxis_title="Veces atacado",
+                plot_bgcolor='white', font=dict(size=12)
+            )
             st.plotly_chart(fig_puertos, use_container_width=True)
         
         st.divider()
         
-        # Tabla con todas las simulaciones (solo columnas existentes)
+        # --- Tabla detallada ---
         st.subheader("📋 Registro detallado de todas las simulaciones")
-        # Definir columnas deseadas, pero filtrar las que realmente existen
-        columnas_deseadas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
-                             'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
-        columnas_existentes = [col for col in columnas_deseadas if col in df_h.columns]
-        df_display = df_h[columnas_existentes].copy()
-        # Formatear porcentajes si existen
+        columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
+                    'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+        for col in columnas:
+            if col not in df_h.columns:
+                df_h[col] = np.nan
+        df_display = df_h.copy()
         for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-        st.dataframe(df_display, use_container_width=True, height=400)
+        st.dataframe(df_display[columnas], use_container_width=True, height=400)
+        
+        # Nota: Los reportes descargables están en la Pestaña 3
     else:
         st.info("💡 No hay datos históricos. Realiza una simulación en la Pestaña 1.")
 
