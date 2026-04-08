@@ -267,8 +267,8 @@ with tab2:
     import requests, base64, io
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     # Configura aquí tus datos de GitHub (los mismos que usas en logic.py)
-    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CAMBIA A TU USUARIO
-    REPO_NAME = "TU_REPOSITORIO"       # <-- CAMBIA A TU REPO
+    REPO_OWNER = "MerlyRivera2002"   # <-- CAMBIA A TU USUARIO
+    REPO_NAME = "https://github.com/MerlyRivera2002/IDS-CNN"       # <-- CAMBIA A TU REPO
     FILE_PATH = "historial.csv"
     
     df_h = None
