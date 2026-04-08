@@ -264,23 +264,23 @@ with tab1:
 
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
-
-       import os
+    
+    # Verificar existencia del archivo
+    import os
     if os.path.exists("historial.csv"):
         st.success("✅ El archivo EXISTE en el servidor")
-        # Opcional: mostrar el tamaño
         st.write(f"Tamaño: {os.path.getsize('historial.csv')} bytes")
     else:
         st.error("❌ El archivo NO EXISTE en el servidor")
+    
+    # Leer datos (desde GitHub o local)
     import requests, base64, io
     github_token = st.secrets.get("GITHUB_TOKEN", None)
-    # Configura aquí tus datos de GitHub (los mismos que usas en logic.py)
-    REPO_OWNER = "MerlyRivera2002"   # <-- CAMBIA A TU USUARIO
-    REPO_NAME = "https://github.com/MerlyRivera2002/IDS-CNN"       # <-- CAMBIA A TU REPO
+    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CÁMBIALO
+    REPO_NAME = "TU_REPOSITORIO"       # <-- CÁMBIALO
     FILE_PATH = "historial.csv"
     
     df_h = None
-    # 1. Intentar leer desde GitHub
     if github_token:
         try:
             url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
@@ -291,40 +291,28 @@ with tab2:
                 content = base64.b64decode(file_data['content']).decode('utf-8')
                 df_h = pd.read_csv(io.StringIO(content))
                 st.success("✅ Datos cargados desde GitHub")
-            else:
-                st.warning(f"No se pudo leer desde GitHub (código {response.status_code})")
-        except Exception as e:
-            st.error(f"Error al leer desde GitHub: {e}")
+        except:
+            pass
     
-    # 2. Si no hay datos de GitHub, intentar archivo local (con tolerancia a errores)
     if df_h is None and os.path.exists("historial.csv"):
         try:
-            # Intentar leer saltando líneas erróneas
-            df_h = pd.read_csv("historial.csv", on_bad_lines='skip', engine='python')
-            st.info("Datos cargados desde archivo local (se omitieron líneas con errores)")
-        except Exception as e:
-            st.error(f"Error al leer archivo local: {e}")
-            st.warning("El archivo historial.csv está corrupto. Puedes borrarlo y generar uno nuevo ejecutando una simulación.")
-            # Opcional: ofrecer botón para borrar
-            if st.button("🗑️ Borrar archivo corrupto"):
-                os.remove("historial.csv")
-                st.rerun()
+            df_h = pd.read_csv("historial.csv")
+            st.info("Datos cargados desde archivo local")
+        except:
+            st.error("Error al leer archivo local")
     
     if df_h is not None and not df_h.empty:
-        # Asegurar columnas y tipos
-        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
+        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
         for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
             if col in df_h.columns:
                 df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
-        df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
+        df_h = df_h.sort_values('Fecha')
         
-        # --- KPIs ---
+        # KPIs
         st.subheader("📌 Resumen global")
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total simulaciones", len(df_h))
-        with col2:
-            st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
+        with col1: st.metric("Total simulaciones", len(df_h))
+        with col2: st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
         with col3:
             avg_acc = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
             st.metric("Precisión promedio", f"{avg_acc:.2%}" if pd.notna(avg_acc) else "N/A")
@@ -334,50 +322,25 @@ with tab2:
         
         st.divider()
         
-        # --- Gráficas de tendencia ---
+        # Gráficas
         st.subheader("📈 Evolución temporal")
         c1, c2 = st.columns(2)
         with c1:
-            fig1 = px.line(
-                df_h, x='Fecha', y='Ataques', markers=True,
-                title="Evolución de intrusiones detectadas",
-                labels={'Ataques': 'Número de ataques', 'Fecha': 'Fecha'},
-                line_shape='linear'
-            )
-            fig1.update_traces(
-                line_color='#e74c3c', line_width=2.5,
-                marker=dict(size=10, symbol='square', color='#2980b9', line=dict(width=1, color='white')),
-                textposition='top center', textfont_size=10
-            )
-            if len(df_h) <= 20:
-                fig1.update_traces(text=df_h['Ataques'].apply(lambda x: str(x)), selector=dict(mode='lines+markers+text'))
-            fig1.update_layout(
-                yaxis=dict(title="Ataques", gridcolor='lightgray', showgrid=True),
-                xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
-                plot_bgcolor='white', font=dict(size=12)
-            )
+            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, title="Evolución de intrusiones detectadas")
+            fig1.update_traces(line_color='#e74c3c', line_width=2.5, marker=dict(size=10, symbol='square', color='#2980b9'))
+            fig1.update_layout(yaxis=dict(gridcolor='lightgray'), plot_bgcolor='white')
             st.plotly_chart(fig1, use_container_width=True)
-        
         with c2:
             puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
             puertos_counts.columns = ['Puerto', 'Frecuencia']
-            fig_puertos = px.bar(
-                puertos_counts, x='Puerto', y='Frecuencia',
-                title="Top 5 puertos más frecuentes",
-                color='Frecuencia', color_continuous_scale='Reds'
-            )
-            fig_puertos.update_layout(
-                xaxis_title="Puerto", yaxis_title="Veces atacado",
-                plot_bgcolor='white', font=dict(size=12)
-            )
+            fig_puertos = px.bar(puertos_counts, x='Puerto', y='Frecuencia', color='Frecuencia', color_continuous_scale='Reds')
             st.plotly_chart(fig_puertos, use_container_width=True)
         
         st.divider()
         
-        # --- Tabla detallada ---
-        st.subheader("📋 Registro detallado de todas las simulaciones")
-        columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
-                    'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+        # Tabla
+        st.subheader("📋 Registro detallado")
+        columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques', 'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
         for col in columnas:
             if col not in df_h.columns:
                 df_h[col] = np.nan
@@ -386,10 +349,8 @@ with tab2:
             if col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
         st.dataframe(df_display[columnas], use_container_width=True, height=400)
-        
-        # Nota: Los reportes descargables están en la Pestaña 3
     else:
-        st.info("💡 No hay datos históricos válidos. Ejecuta una simulación en la Pestaña 1 para generar el archivo.")
+        st.info("💡 No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
 
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
