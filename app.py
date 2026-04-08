@@ -153,8 +153,16 @@ with tab1:
                 
                 # GUARDAR EN HISTORIAL
                 p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
-                # Se envía el 'acc' calculado para que la pestaña 2 tenga datos de precisión
-                logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top, acc)
+     logic.guardar_en_historial(
+    "historial.csv",      # 1. archivo_hist
+    archivo.name,         # 2. nombre_dataset
+    len(preds_totales),   # 3. total
+    ataques,              # 4. ataques
+    (time.time()-t_inicio), # 5. tiempo
+    fecha_simulada,       # 6. fecha_simulada
+    p_top,                # 7. puerto_top
+    acc                   # 8. acc (el accuracy calculado)
+)
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
