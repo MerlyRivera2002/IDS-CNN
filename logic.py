@@ -3,11 +3,13 @@ import numpy as np
 import os
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc):
-    """Guarda los resultados de la simulación con métricas de rendimiento."""
+    """Guarda los resultados. Ahora incluye cálculo de normales para la tabla maestra."""
+    normales = total - ataques
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
         "Dataset": nombre_dataset,
         "Total": total,
+        "Normales": normales,
         "Ataques": ataques,
         "Puerto": f"Port {puerto_top}",
         "Tiempo": round(tiempo, 2),
