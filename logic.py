@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc):
+    """Guarda los resultados incluyendo el Accuracy para el Cap 4."""
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
         "Dataset": nombre_dataset,
@@ -10,8 +11,8 @@ def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, f
         "Ataques": ataques,
         "Puerto": f"Port {puerto_top}",
         "Tiempo": round(tiempo, 2),
-        "Accuracy": f"{acc:.2%}" # Guardamos el porcentaje para el reporte
-    }]).
+        "Accuracy": round(float(acc), 4)
+    }])
     
     if not os.path.isfile(archivo_hist) or os.path.getsize(archivo_hist) == 0:
         nuevo_registro.to_csv(archivo_hist, index=False)
@@ -19,6 +20,7 @@ def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, f
         nuevo_registro.to_csv(archivo_hist, mode='a', header=False, index=False)
 
 def obtener_metricas_resumen(archivo_hist):
+    """Lee el historial para las gráficas de tendencia."""
     if os.path.exists(archivo_hist):
         try:
             df = pd.read_csv(archivo_hist)
