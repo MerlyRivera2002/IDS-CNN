@@ -4,7 +4,8 @@ import os
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc, precision=None, recall=None, f1=None):
     """
-    Guarda los resultados de la simulación incluyendo métricas de rendimiento.
+    Guarda los resultados de la simulación de forma persistente.
+    Ahora incluye Precision, Recall y F1-Score.
     """
     normales = total - ataques
     nuevo_registro = pd.DataFrame([{
@@ -40,7 +41,7 @@ def obtener_metricas_resumen(archivo_hist):
             df = pd.read_csv(archivo_hist)
             if not df.empty:
                 df['Fecha'] = pd.to_datetime(df['Fecha'])
-                # Asegurar que las columnas numéricas sean float
+                # Convertir columnas numéricas
                 for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -49,4 +50,12 @@ def obtener_metricas_resumen(archivo_hist):
             print(f"Error al leer historial: {e}")
             return None
     return None
-)
+
+def generar_estadisticas_puertos(df):
+    """
+    Función extra para el reporte: Agrupa ataques por puerto.
+    """
+    if df is not None and not df.empty:
+        resumen = df.groupby('Puerto')['Ataques'].sum().reset_index()
+        return resumen.sort_values('Ataques', ascending=False)
+    return None
