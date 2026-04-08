@@ -2,15 +2,16 @@ import pandas as pd
 import numpy as np
 import os
 
-def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top):
+def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc):
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
         "Dataset": nombre_dataset,
-        "Registros_Procesados": total,
-        "Ataques_Detectados": ataques,
-        "Puerto_Critico": f"Port {puerto_top}",
-        "Tiempo_Ejecucion_Seg": round(tiempo, 2)
-    }])
+        "Total": total,
+        "Ataques": ataques,
+        "Puerto": f"Port {puerto_top}",
+        "Tiempo": round(tiempo, 2),
+        "Accuracy": f"{acc:.2%}" # Guardamos el porcentaje para el reporte
+    }]).
     
     if not os.path.isfile(archivo_hist) or os.path.getsize(archivo_hist) == 0:
         nuevo_registro.to_csv(archivo_hist, index=False)
