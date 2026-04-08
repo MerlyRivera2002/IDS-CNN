@@ -264,15 +264,15 @@ with tab1:
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
     
-    # Leer directamente desde GitHub usando el token (sin depender de logic.py)
     import requests, base64, io
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     # Configura aquí tus datos de GitHub (los mismos que usas en logic.py)
-    REPO_OWNER = "MerlyRivera2002"   # <-- CAMBIA A TU USUARIO
-    REPO_NAME = "https://github.com/MerlyRivera2002/IDS-CNN"       # <-- CAMBIA A TU REPO
+    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CAMBIA A TU USUARIO
+    REPO_NAME = "TU_REPOSITORIO"       # <-- CAMBIA A TU REPO
     FILE_PATH = "historial.csv"
     
     df_h = None
+    # 1. Intentar leer desde GitHub
     if github_token:
         try:
             url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
@@ -282,30 +282,34 @@ with tab2:
                 file_data = response.json()
                 content = base64.b64decode(file_data['content']).decode('utf-8')
                 df_h = pd.read_csv(io.StringIO(content))
-                df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
-                for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-                    if col in df_h.columns:
-                        df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
-                df_h = df_h.sort_values('Fecha')
-                st.success(f"✅ Datos cargados desde GitHub: {len(df_h)} simulaciones")
+                st.success("✅ Datos cargados desde GitHub")
             else:
-                st.warning(f"No se pudo leer desde GitHub (código {response.status_code}). Revisa token y repo.")
+                st.warning(f"No se pudo leer desde GitHub (código {response.status_code})")
         except Exception as e:
             st.error(f"Error al leer desde GitHub: {e}")
-    else:
-        st.info("No hay token de GitHub configurado. Intentando leer archivo local...")
     
-    # Fallback a archivo local si no hay GitHub o falló
+    # 2. Si no hay datos de GitHub, intentar archivo local (con tolerancia a errores)
     if df_h is None and os.path.exists("historial.csv"):
-        df_h = pd.read_csv("historial.csv")
-        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
+        try:
+            # Intentar leer saltando líneas erróneas
+            df_h = pd.read_csv("historial.csv", on_bad_lines='skip', engine='python')
+            st.info("Datos cargados desde archivo local (se omitieron líneas con errores)")
+        except Exception as e:
+            st.error(f"Error al leer archivo local: {e}")
+            st.warning("El archivo historial.csv está corrupto. Puedes borrarlo y generar uno nuevo ejecutando una simulación.")
+            # Opcional: ofrecer botón para borrar
+            if st.button("🗑️ Borrar archivo corrupto"):
+                os.remove("historial.csv")
+                st.rerun()
+    
+    if df_h is not None and not df_h.empty:
+        # Asegurar columnas y tipos
+        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
         for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
             if col in df_h.columns:
                 df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
-        df_h = df_h.sort_values('Fecha')
-        st.info(f"Datos cargados desde archivo local: {len(df_h)} simulaciones")
-    
-    if df_h is not None and not df_h.empty:
+        df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
+        
         # --- KPIs ---
         st.subheader("📌 Resumen global")
         col1, col2, col3, col4 = st.columns(4)
@@ -322,7 +326,7 @@ with tab2:
         
         st.divider()
         
-        # --- Gráficas de tendencia (estilo imagen) ---
+        # --- Gráficas de tendencia ---
         st.subheader("📈 Evolución temporal")
         c1, c2 = st.columns(2)
         with c1:
@@ -377,7 +381,7 @@ with tab2:
         
         # Nota: Los reportes descargables están en la Pestaña 3
     else:
-        st.info("💡 No hay datos históricos. Asegúrate de haber ejecutado al menos una simulación en la Pestaña 1 y que se haya guardado correctamente.")
+        st.info("💡 No hay datos históricos válidos. Ejecuta una simulación en la Pestaña 1 para generar el archivo.")
 
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
