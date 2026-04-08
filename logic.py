@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top):
-    """Guarda los resultados de la simulación en un archivo CSV para la Pestaña 2."""
+    """Guarda los resultados de la simulación en un archivo CSV."""
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
         "Dataset": nombre_dataset,
@@ -19,9 +19,13 @@ def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, f
         nuevo_registro.to_csv(archivo_hist, mode='a', header=False, index=False)
 
 def obtener_metricas_resumen(archivo_hist):
-    """Lee el historial y devuelve datos para las gráficas."""
+    """Lee el historial para las gráficas de la Pestaña 2."""
     if os.path.exists(archivo_hist):
-        df = pd.read_csv(archivo_hist)
-        df['Fecha'] = pd.to_datetime(df['Fecha'])
-        return df.sort_values('Fecha')
+        try:
+            df = pd.read_csv(archivo_hist)
+            if not df.empty:
+                df['Fecha'] = pd.to_datetime(df['Fecha'])
+                return df.sort_values('Fecha')
+        except:
+            return None
     return None
