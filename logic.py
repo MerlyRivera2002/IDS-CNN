@@ -1,15 +1,16 @@
 import pandas as pd
-import numpy as np
 import os
+from datetime import datetime
 
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc, precision=None, recall=None, f1=None):
     """
-    Guarda los resultados de la simulación de forma persistente.
-    Ahora incluye Precision, Recall y F1-Score.
+    Guarda los resultados de la simulación incluyendo hora exacta.
     """
     normales = total - ataques
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
+        "Hora": ahora,
         "Dataset": nombre_dataset,
         "Total": total,
         "Normales": normales,
@@ -33,15 +34,12 @@ def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, f
         return False
 
 def obtener_metricas_resumen(archivo_hist):
-    """
-    Lee el historial y prepara los datos para las gráficas.
-    """
     if os.path.exists(archivo_hist):
         try:
             df = pd.read_csv(archivo_hist)
             if not df.empty:
                 df['Fecha'] = pd.to_datetime(df['Fecha'])
-                # Convertir columnas numéricas
+                # Asegurar columnas numéricas
                 for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -49,13 +47,4 @@ def obtener_metricas_resumen(archivo_hist):
         except Exception as e:
             print(f"Error al leer historial: {e}")
             return None
-    return None
-
-def generar_estadisticas_puertos(df):
-    """
-    Función extra para el reporte: Agrupa ataques por puerto.
-    """
-    if df is not None and not df.empty:
-        resumen = df.groupby('Puerto')['Ataques'].sum().reset_index()
-        return resumen.sort_values('Ataques', ascending=False)
     return None
