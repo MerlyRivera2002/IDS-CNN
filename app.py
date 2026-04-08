@@ -46,7 +46,7 @@ model, scaler, features_list = load_assets()
 
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# ----------------------------------------- PESTAÑA 1 (COMPLETA Y CORREGIDA) ------------------------------------
+# ----------------------------------------- PESTAÑA 1 (TU ARQUITECTURA) -----------------------------------------------------------
 with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("🛡️ Monitor de Tráfico en Tiempo Real")
@@ -73,7 +73,7 @@ with tab1:
                 preds_totales = []
                 t_inicio = time.time()
                 
-                # 2. BUCLE DE SIMULACIÓN
+                # 2. BUCLE DE SIMULACIÓN (FLUÍDO)
                 for i in range(0, len(df_clean), 15): 
                     chunk = df_clean.iloc[i : i + 15]
                     X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
@@ -83,18 +83,18 @@ with tab1:
                     ataques = sum(preds_totales)
                     normales = len(preds_totales) - ataques
                     
-                    # A. Gráfico de Pastel
+                    # A. Actualizar Gráfico de Pastel
                     fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'], 
                                    color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6)
                     fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=True)
                     espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{i}")
                     
-                    # B. Métricas
+                    # B. Actualizar Métricas
                     with espacio_metricas.container():
                         st.metric("CONEXIONES TOTALES", f"{len(preds_totales)}")
                         st.metric("INTRUSIONES DETECTADAS", f"{ataques}", delta=f"+{chunk_preds.sum()}", delta_color="inverse")
 
-                    # C. Tabla con Diagnóstico
+                    # C. Actualizar Tabla con Diagnóstico
                     with espacio_tabla.container():
                         vista = chunk.copy()
                         vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
@@ -115,11 +115,11 @@ with tab1:
                 st.success("✅ Simulación finalizada.")
                 st.divider()
 
-                # 3. MÉTRICAS FINALES Y GUARDADO (PUNTO CRÍTICO)
+                # 3. MÉTRICAS FINALES
                 st.subheader("📊 Evaluación del Rendimiento (Final)")
                 col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
                 
-                acc = 0.0 # Valor base
+                acc = 0.0 # Inicializamos para que no de error
                 
                 if col_label:
                     y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
@@ -141,10 +141,11 @@ with tab1:
                         st.write("**Gráfico de Rendimiento (Scores)**")
                         df_m = pd.DataFrame({'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'], 'Valor': [acc, prec, rec, f1]})
                         fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True, text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
+                        fig_m.update_traces(line_color='#1f77b4', marker=dict(size=12, symbol='square', color='#ff7f0e'))
                         fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
                         st.plotly_chart(fig_m, use_container_width=True)
                 
-                # --- AQUÍ ESTABA EL ERROR: AHORA ENVÍA LOS 8 DATOS CORRECTOS ---
+                # --- AQUÍ CORREGIMOS EL ENVÍO DE DATOS (8 ARGUMENTOS) ---
                 p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
                 logic.guardar_en_historial(
                     "historial.csv", 
@@ -154,84 +155,41 @@ with tab1:
                     (time.time()-t_inicio), 
                     fecha_simulada, 
                     p_top, 
-                    acc
+                    acc # <--- ESTO FALTABA
                 )
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
-# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 2 (BITÁCORA) -----------------------------------------------------------
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
     
-    # --- BOTÓN DE EMERGENCIA PARA TESTEO ---
-    if st.button("🛠️ FORZAR DATOS DE PRUEBA"):
-        logic.guardar_en_historial("historial.csv", "test_pcap.csv", 500, 150, 10.5, "2026-04-01", 80, 0.98)
-        st.success("Dato insertado. Ahora recarga la página.")
-        st.rerun()
-    # ---------------------------------------
-
     df_h = logic.obtener_metricas_resumen("historial.csv")
-    # ... (todo el código de gráficas que ya tienes)
     
     if df_h is not None and not df_h.empty:
-        # --- SOLUCIÓN AL KEYERROR: Asegurar que existan todas las columnas ---
+        # Aseguramos columnas para la tabla
         if 'Normales' not in df_h.columns:
             df_h['Normales'] = df_h['Total'] - df_h['Ataques']
-        
-        # 1. GRÁFICAS DE TENDENCIA (Estilo de la imagen adjunta)
-        col_g1, col_g2 = st.columns(2)
-        
-        with col_g1:
-            st.subheader("📈 Tendencia de Ataques")
-            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, 
-                           title="Evolución Temporal de Capturas (Ataques)")
-            fig1.update_traces(line_color='#00558c', marker=dict(size=10, symbol='square'))
-            st.plotly_chart(fig1, use_container_width=True)
             
-        with col_g2:
-            st.subheader("📡 Tendencia por Puertos")
-            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True, 
-                           title="Puertos Críticos Identificados")
-            fig2.update_traces(line_color='#2c3e50', marker=dict(size=10, symbol='circle'))
-            st.plotly_chart(fig2, use_container_width=True)
-
+        # 1. GRÁFICA DE TENDENCIA
+        st.subheader("📈 Tendencia de Ataques")
+        fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True)
+        fig1.update_traces(line_color='#00558c', marker=dict(size=10, symbol='square'))
+        st.plotly_chart(fig1, use_container_width=True)
+            
         st.divider()
 
-        # 2. TABLA MAESTRA (Matriz para Capítulo 4)
-        st.subheader("📋 Matriz de Datos y Métricas de Rendimiento")
-        
+        # 2. TABLA MAESTRA
+        st.subheader("📋 Matriz de Datos (Capítulo 4)")
         df_ver = df_h.copy()
-        
-        # Formatear Accuracy de forma segura
         if 'Accuracy' in df_ver.columns:
             df_ver['Accuracy'] = df_ver['Accuracy'].apply(lambda x: f"{float(x):.2%}")
         
-        # Seleccionar solo las columnas que sabemos que existen o hemos creado
-        columnas_visibles = ['Fecha', 'Dataset', 'Total', 'Normales', 'Ataques', 'Puerto', 'Accuracy']
-        st.dataframe(df_ver[columnas_visibles], use_container_width=True)
+        st.dataframe(df_ver[['Fecha', 'Dataset', 'Total', 'Normales', 'Ataques', 'Puerto', 'Accuracy']], use_container_width=True)
 
-        # 3. REPORTE Y TOMA DE DECISIONES
-        st.subheader("💡 Reporte para Toma de Decisiones (Soporte Cap. 4)")
-        
-        puerto_recurrente = df_h['Puerto'].mode()[0]
-        acc_promedio = df_h['Accuracy'].mean()
-        
-        st.info(f"""
-        **Análisis para la Tesis:**
-        * El sistema identifica una vulnerabilidad recurrente en el **{puerto_recurrente}**.
-        * El modelo CNN mantiene una confiabilidad promedio del **{acc_promedio:.2%}**.
-        * Se sugiere reforzar las reglas de firewall para el puerto con mayor pico de ataques.
-        """)
-
-        # Botones de acción
-        col1, col2 = st.columns(2)
-        with col1:
-            csv = df_h.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Reporte CSV", csv, "reporte_ids.csv", "text/csv")
-        with col2:
-            if st.button("🗑️ Resetear Historial"):
-                if os.path.exists("historial.csv"):
-                    os.remove("historial.csv")
-                    st.rerun()
+        # 3. ACCIONES
+        if st.button("🗑️ Borrar Historial"):
+            if os.path.exists("historial.csv"): os.remove("historial.csv")
+            st.rerun()
     else:
         st.info("No hay datos históricos. Por favor, realiza una simulación en la Pestaña 1.")
