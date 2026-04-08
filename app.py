@@ -7,12 +7,12 @@ import os
 import time
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
 import logic 
 
 st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
 
-# --- LOGIN (TU CÓDIGO INTACTO) ---
+# --- LOGIN ---
 if 'perfil' not in st.session_state: st.session_state.perfil = None
 
 st.sidebar.title("🔐 Control de Acceso")
@@ -30,7 +30,6 @@ if st.session_state.perfil is None:
     st.stop()
 else:
     st.sidebar.success(f"Conectado como: {st.session_state.perfil}")
-    # --- NUEVO: SELECTOR DE FECHA PARA TESIS ---
     st.sidebar.divider()
     st.sidebar.subheader("📅 Simulación de Tiempo")
     fecha_simulada = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
@@ -38,7 +37,7 @@ else:
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.clear(); st.rerun()
 
-# Carga de archivos
+# Carga de activos
 @st.cache_resource
 def load_assets():
     return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
@@ -47,132 +46,145 @@ model, scaler, features_list = load_assets()
 
 tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
 
-# --- ---------------------------------------------DENTRO DE TU PESTAÑA 1 -------------------------------------------------------------
+# ----------------------------------------- PESTAÑA 1 -----------------------------------------------------------
 with tab1:
-    st.header("🛡️ Monitor de Tráfico en Tiempo Real")
-    archivo = st.file_uploader("Subir dataset para simulación", type=["csv"])
-    
-    if archivo:
-        if st.button("🚀 INICIAR MONITOREO"):
-            # 1. CREAMOS LOS CONTENEDORES VACÍOS (Para evitar el parpadeo)
-            col_izq, col_der = st.columns([1, 1])
-            with col_izq:
-                espacio_pastel = st.empty()
-            with col_der:
-                espacio_metricas = st.empty()
-            
-            st.write("---")
-            st.subheader("🛰️ Registro de Actividad")
-            espacio_tabla = st.empty()
-            
-            # Procesamiento inicial
-            df_raw = pd.read_csv(archivo)
-            # ... (Aquí va tu limpieza de datos y preparación) ...
-            
-            preds_totales = []
-            
-            # 2. EL BUCLE DE SIMULACIÓN (Velocidad controlada)
-            # Procesamos de 10 en 10 para que sea más fluido
-            for i in range(0, len(df_clean), 10):
-                chunk = df_clean.iloc[i : i + 10]
-                # Inferencia de la IA
-                X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
-                chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
-                preds_totales.extend(chunk_preds)
+    if st.session_state.perfil == "Administrador":
+        st.header("🛡️ Monitor de Tráfico en Tiempo Real")
+        archivo = st.file_uploader("Subir dataset para simulación", type=["csv"], key="uploader_sim")
+        
+        if archivo:
+            if st.button("🚀 INICIAR MONITOREO"):
+                # 1. CONTENEDORES PARA LA SIMULACIÓN EN VIVO
+                col_izq, col_der = st.columns([1, 1])
+                with col_izq:
+                    espacio_pastel = st.empty()
+                with col_der:
+                    espacio_metricas = st.empty()
                 
-                # CÁLCULOS PARA VISUALIZACIÓN
-                ataques = sum(preds_totales)
-                normales = len(preds_totales) - ataques
+                st.divider()
+                st.subheader("🛰️ Registro de Actividad")
+                espacio_tabla = st.empty()
                 
-                # A. Actualizar Gráfico de Pastel (Sin parpadeo)
-                fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'], 
-                               color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6)
-                fig_pie.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0), showlegend=False)
-                espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"p_{i}")
+                # Procesamiento de datos
+                df_raw = pd.read_csv(archivo)
+                df_raw.columns = df_raw.columns.str.strip()
+                df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
                 
-                # B. Actualizar Métricas (Estilo Dashboard Pro)
-                with espacio_metricas.container():
-                    st.metric("CONEXIONES TOTALES", len(preds_totales))
-                    st.metric("INTRUSIONES DETECTADAS", ataques, delta=f"+{chunk_preds.sum()}", delta_color="inverse")
-
-                # C. Actualizar Tabla (Con la columna de "Naturaleza")
-                with espacio_tabla.container():
-                    # Tomamos los últimos 15 para la vista rápida
-                    vista = chunk.copy()
-                    vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
+                preds_totales = []
+                t_inicio = time.time()
+                
+                # 2. BUCLE DE SIMULACIÓN (FLUÍDO)
+                for i in range(0, len(df_clean), 15): 
+                    chunk = df_clean.iloc[i : i + 15]
+                    X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
+                    chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
+                    preds_totales.extend(chunk_preds)
                     
-                    # AQUÍ ESTÁ TU COLUMNA DE NATURALEZA
-                    def sugerir_amenaza(row):
-                        if "NORMAL" in row['Estado']: return "Tráfico Seguro"
-                        p = row['Destination Port']
-                        if p in [80, 443]: return "Ataque Web (HTTP/S)"
-                        if p == 22: return "Fuerza Bruta (SSH)"
-                        if p == 21: return "Acceso FTP no aut."
-                        return "Escaneo / Port Scan"
+                    ataques = sum(preds_totales)
+                    normales = len(preds_totales) - ataques
                     
-                    vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
+                    # A. Actualizar Gráfico de Pastel
+                    fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'], 
+                                   color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6)
+                    fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=True)
+                    espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{i}")
                     
-                    # Mostramos solo columnas clave para que no se vea ancho
-                    st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
+                    # B. Actualizar Métricas
+                    with espacio_metricas.container():
+                        st.metric("CONEXIONES TOTALES", f"{len(preds_totales)}")
+                        st.metric("INTRUSIONES DETECTADAS", f"{ataques}", delta=f"+{chunk_preds.sum()}", delta_color="inverse")
 
-                # 3. EL "PASO" (Control de velocidad)
-                # 0.1 es una velocidad natural. 0.05 es más rápido pero visible.
-                time.sleep(0.1) 
+                    # C. Actualizar Tabla con Diagnóstico
+                    with espacio_tabla.container():
+                        vista = chunk.copy()
+                        vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
+                        
+                        def sugerir_amenaza(row):
+                            if "NORMAL" in row['Estado']: return "Tráfico Seguro"
+                            p = row['Destination Port']
+                            if p in [80, 443]: return "Ataque Web (HTTP/S)"
+                            if p == 22: return "Fuerza Bruta (SSH)"
+                            if p == 21: return "Acceso FTP"
+                            return "Escaneo / Port Scan"
+                        
+                        vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
+                        st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
 
-            st.success("✅ Simulación finalizada. Resultados guardados en el historial.")
+                    time.sleep(0.08)
 
-# --------------------------------------------- EN LA PESTAÑA 2: GRÁFICA ESTILO CAPTURAS -----------------------------------------------
-st.subheader("📈 Evolución Diaria de Capturas")
+                st.success("✅ Simulación finalizada.")
+                st.divider()
 
-if os.path.exists("historial.csv"):
-    df_h = pd.read_csv("historial.csv")
-    df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
-    df_h = df_h.sort_values('Fecha_Dt')
-    
-    # Creamos un nombre corto para el eje X (Ej: "Lun 01")
-    df_h['Dia_Eje'] = df_h['Fecha_Dt'].dt.strftime('%a %d')
+                # 3. MÉTRICAS FINALES
+                st.subheader("📊 Evaluación del Rendimiento (Final)")
+                col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+                
+                if col_label:
+                    y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
+                    y_true = y_true[:len(preds_totales)]
+                    
+                    acc = accuracy_score(y_true, preds_totales)
+                    prec = precision_score(y_true, preds_totales, zero_division=0)
+                    rec = recall_score(y_true, preds_totales, zero_division=0)
+                    f1 = f1_score(y_true, preds_totales, zero_division=0)
 
-    # Creamos la gráfica
-    fig_evolucion = px.line(
-        df_h, 
-        x='Dia_Eje', 
-        y='Ataques_Detectados',
-        markers=True,
-        text='Ataques_Detectados' # Pone el número encima del punto
-    )
+                    c_mat, c_line = st.columns([1, 1])
+                    with c_mat:
+                        st.write("**Matriz de Confusión**")
+                        cm = confusion_matrix(y_true, preds_totales)
+                        fig_cm = px.imshow(cm, text_auto=True, x=['Pred: Norm', 'Pred: Atq'], y=['Real: Norm', 'Real: Atq'], color_continuous_scale='Reds')
+                        st.plotly_chart(fig_cm, use_container_width=True)
+                    
+                    with c_line:
+                        st.write("**Gráfico de Rendimiento (Scores)**")
+                        df_m = pd.DataFrame({
+                            'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
+                            'Valor': [acc, prec, rec, f1]
+                        })
+                        fig_m = px.line(df_m, x='Métrica', y='Valor', markers=True, text=df_m['Valor'].apply(lambda x: f"{x:.2f}"))
+                        fig_m.update_traces(line_color='#1f77b4', marker=dict(size=12, symbol='square', color='#ff7f0e'))
+                        fig_m.update_layout(yaxis=dict(range=[0, 1.1]))
+                        st.plotly_chart(fig_m, use_container_width=True)
+                
+                # GUARDAR EN HISTORIAL
+                p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
+                logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top)
+    else:
+        st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
-    # --- AQUÍ ESTÁ LA MAGIA PARA QUE SE PAREZCA A TU FOTO ---
-    fig_evolucion.update_traces(
-        mode='lines+markers',
-        line_shape='linear',
-        marker=dict(
-            symbol='square', # Puntos cuadrados como en tu imagen
-            size=10, 
-            color='#1f77b4', # Azul clásico
-            line=dict(width=1, color='white')
-        ),
-        line=dict(width=3, color='#1f77b4'),
-        textposition="top center"
-    )
+# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+with tab2:
+    st.header("📊 Bitácora de Capturas")
+    st.subheader("📈 Evolución Diaria de Capturas")
 
-    # Configuración de la cuadrícula y el SCROLLBAR
-    fig_evolucion.update_layout(
-        xaxis=dict(
-            showgrid=True, 
-            gridcolor='lightgrey',
-            # Esto activa el scrollbar abajo para "correr al lado"
-            rangeslider=dict(visible=True), 
-            type='category'
-        ),
-        yaxis=dict(
-            showgrid=True, 
-            gridcolor='lightgrey',
-            range=[0, df_h['Ataques_Detectados'].max() + 2] # Para que no pegue al techo
-        ),
-        plot_bgcolor='rgba(240,240,240,0.5)', # Fondo gris suave como el de tu foto
-        height=500
-    )
+    if os.path.exists("historial.csv"):
+        df_h = pd.read_csv("historial.csv")
+        df_h['Fecha_Dt'] = pd.to_datetime(df_h['Fecha'])
+        df_h = df_h.sort_values('Fecha_Dt')
+        df_h['Dia_Eje'] = df_h['Fecha_Dt'].dt.strftime('%a %d')
 
-    st.plotly_chart(fig_evolucion, use_container_width=True)
-else:
-    st.info("No hay datos para mostrar la evolución.")
+        fig_evolucion = px.line(
+            df_h, x='Dia_Eje', y='Ataques_Detectados',
+            markers=True, text='Ataques_Detectados'
+        )
+
+        fig_evolucion.update_traces(
+            mode='lines+markers', line_shape='linear',
+            marker=dict(symbol='square', size=10, color='#1f77b4', line=dict(width=1, color='white')),
+            line=dict(width=3, color='#1f77b4'),
+            textposition="top center"
+        )
+
+        fig_evolucion.update_layout(
+            xaxis=dict(showgrid=True, gridcolor='lightgrey', rangeslider=dict(visible=True), type='category'),
+            yaxis=dict(showgrid=True, gridcolor='lightgrey', range=[0, df_h['Ataques_Detectados'].max() + 5]),
+            plot_bgcolor='rgba(240,240,240,0.5)', height=500
+        )
+
+        st.plotly_chart(fig_evolucion, use_container_width=True)
+        
+        st.divider()
+        st.subheader("📋 Registros Históricos")
+        st.dataframe(df_h[['Fecha', 'Archivo', 'Total_Registros', 'Ataques_Detectados', 'Puerto_Critico']], use_container_width=True)
+    else:
+        st.info("Aún no hay datos en la bitácora. Realiza un monitoreo en la Pestaña 1.")
