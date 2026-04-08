@@ -308,7 +308,7 @@ with tab2:
                 df_h = pd.read_csv(io.StringIO(content))
                 st.success("✅ Datos cargados desde GitHub")
             else:
-                st.warning(f"No se encontró archivo en GitHub (código {response.status_code}). Usando archivo local.")
+                # st.warning(f"No se encontró archivo en GitHub (código {response.status_code}). Usando archivo local.")
         except Exception as e:
             st.warning(f"Error al leer GitHub: {e}. Usando archivo local.")
     
