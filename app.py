@@ -6,54 +6,6 @@ import joblib
 import os
 import time
 import plotly.express as px
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
-import logic 
-
-st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
-
-# --- LOGIN ---
-if 'perfil' not in st.session_state: st.session_state.perfil = None
-
-st.sidebar.title("🔐 Control de Acceso")
-if st.session_state.perfil is None:
-    u = st.sidebar.text_input("Usuario")
-    p = st.sidebar.text_input("Clave", type="password")
-    if st.sidebar.button("Ingresar"):
-        if u == "admin" and p == "tesis2026": 
-            st.session_state.perfil = "Administrador"
-            st.rerun()
-        elif u == "viewer" and p == "visita2026":
-            st.session_state.perfil = "Visualizador"
-            st.rerun()
-        else: st.sidebar.error("Credenciales incorrectas")
-    st.stop()
-else:
-    st.sidebar.success(f"Conectado como: {st.session_state.perfil}")
-    st.sidebar.divider()
-    st.sidebar.subheader("📅 Simulación de Tiempo")
-    fecha_simulada = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
-    if st.sidebar.button("Cerrar Sesión"):
-        st.session_state.clear(); st.rerun()
-
-# Carga de activos
-@st.cache_resource
-def load_assets():
-    return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
-
-model, scaler, features_list = load_assets()
-
-tab1, tab2 = st.tabs(["🚀 MONITOREO (Solo Admin)", "📊 BITÁCORA Y REPORTES"])
-
-pestaña 1
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-import joblib
-import os
-import time
-import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
 import logic 
@@ -88,7 +40,11 @@ else:
 # Carga de activos
 @st.cache_resource
 def load_assets():
-    return tf.keras.models.load_model("modelo_cnn.keras"), joblib.load("scaler.pkl"), joblib.load("features.pkl")
+    # Asegúrate de que estos archivos estén en la misma carpeta que el script
+    model = tf.keras.models.load_model("modelo_cnn.keras")
+    scaler = joblib.load("scaler.pkl")
+    features = joblib.load("features.pkl")
+    return model, scaler, features
 
 model, scaler, features_list = load_assets()
 
@@ -167,6 +123,7 @@ with tab1:
                 st.subheader("📊 Evaluación del Rendimiento (Final)")
                 col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
                 
+                acc = 0.0 # Valor por defecto si no hay etiquetas reales
                 if col_label:
                     y_true = df_clean[col_label].astype(str).str.upper().apply(lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
                     y_true = y_true[:len(preds_totales)]
@@ -196,65 +153,11 @@ with tab1:
                 
                 # GUARDAR EN HISTORIAL
                 p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
-                logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top)
+                # Se envía el 'acc' calculado para que la pestaña 2 tenga datos de precisión
+                logic.guardar_en_historial("historial.csv", archivo.name, len(preds_totales), ataques, (time.time()-t_inicio), fecha_simulada, p_top, acc)
     else:
         st.warning("🔒 Esta pestaña solo es accesible para Administradores.")
 
-
-ya esta falta el rsto pero esa esta!!
-
-
- 
-
-# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 with tab2:
-    st.header("📊 Inteligencia de Red y Toma de Decisiones")
-    
-    # 1. Cargar datos desde el historial
-    df_h = logic.obtener_metricas_resumen("historial.csv")
-    
-    if df_h is not None and not df_h.empty:
-        # 2. GRÁFICAS DE TENDENCIA (IGUALES A TU DIBUJO)
-        col_g1, col_g2 = st.columns(2)
-        
-        with col_g1:
-            st.subheader("📈 Tendencia de Intrusiones")
-            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, title="Ataques Detectados por Fecha")
-            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10, symbol='circle'))
-            st.plotly_chart(fig1, use_container_width=True)
-            
-        with col_g2:
-            st.subheader("📈 Tendencia de Puertos")
-            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True, title="Evolución de Puertos Críticos")
-            fig2.update_traces(line_color='#3498db', marker=dict(size=10, symbol='square'))
-            st.plotly_chart(fig2, use_container_width=True)
-
-        st.divider()
-
-        # 3. TABLA MAESTRA (REFERENCIA CAPÍTULO 4)
-        st.subheader("📋 Matriz de Datos para Toma de Decisiones")
-        df_ver = df_h.copy()
-        if 'Accuracy' in df_ver.columns:
-            df_ver['Accuracy'] = df_ver['Accuracy'].apply(lambda x: f"{x:.2%}")
-        
-        st.dataframe(df_ver, use_container_width=True)
-
-        # 4. TOMA DE DECISIONES AUTOMÁTICA
-        st.subheader("💡 Recomendaciones Basadas en Tendencias")
-        puerto_top = df_h['Puerto'].mode()[0]
-        acc_prom = df_h['Accuracy'].mean()
-        
-        st.info(f"""
-        **Análisis para la Tesis:**
-        * El sistema identifica una vulnerabilidad recurrente en el **{puerto_top}**.
-        * El modelo CNN mantiene una confiabilidad promedio del **{acc_prom:.2%}**.
-        * Se sugiere reforzar las reglas de firewall para el puerto con mayor pico de ataques.
-        """)
-
-        if st.button("🗑️ Resetear Bitácora"):
-            if os.path.exists("historial.csv"):
-                os.remove("historial.csv")
-                st.rerun()
-    else:
-        st.info("No hay datos históricos. Por favor, realiza una simulación en la Pestaña 1.")
+    st.info("Pestaña en espera de configuración...")
