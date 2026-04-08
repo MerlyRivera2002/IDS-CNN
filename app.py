@@ -266,70 +266,34 @@ with tab2:
     st.header("📈 Análisis histórico y tendencias")
     
     import os
-    import requests
-    import base64
-    import io
     import pandas as pd
     import numpy as np
     import plotly.express as px
     
-    # -------------------------------------------------------------
-    # 1. Verificar y limpiar archivo corrupto
-    # -------------------------------------------------------------
     archivo_local = "historial.csv"
-    if os.path.exists(archivo_local):
-        try:
-            pd.read_csv(archivo_local)
-        except Exception as e:
-            st.error(f"❌ Archivo local corrupto: {e}")
-            if st.button("🗑️ Borrar archivo corrupto"):
-                os.remove(archivo_local)
-                st.success("Archivo eliminado. Recarga la página.")
-                st.rerun()
-            st.stop()
     
-    # -------------------------------------------------------------
-    # 2. Cargar datos desde GitHub (prioritario) o local
-    # -------------------------------------------------------------
-    df_h = None
-    github_token = st.secrets.get("GITHUB_TOKEN", None)
-    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CÁMBIALO
-    REPO_NAME = "TU_REPOSITORIO"       # <-- CÁMBIALO
-    FILE_PATH = "historial.csv"
-    
-    if github_token:
-        try:
-            url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-            headers = {"Authorization": f"token {github_token}"}
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                file_data = response.json()
-                content = base64.b64decode(file_data['content']).decode('utf-8')
-                df_h = pd.read_csv(io.StringIO(content))
-                st.success("✅ Datos cargados desde GitHub")
-            else:
-                # st.warning(f"No se encontró archivo en GitHub (código {response.status_code}). Usando archivo local.")
-        except Exception as e:
-            st.warning(f"Error al leer GitHub: {e}. Usando archivo local.")
-    
-    if df_h is None and os.path.exists(archivo_local):
-        try:
-            df_h = pd.read_csv(archivo_local)
-            st.info("Datos cargados desde archivo local")
-        except Exception as e:
-            st.error(f"Error al leer archivo local: {e}")
-            st.stop()
-    
-    if df_h is None or df_h.empty:
+    # Verificar existencia y no corrupción
+    if not os.path.exists(archivo_local):
         st.warning("No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
+        st.stop()
+    
+    try:
+        df_h = pd.read_csv(archivo_local)
+    except Exception as e:
+        st.error(f"Error al leer archivo local: {e}")
+        if st.button("🗑️ Borrar archivo corrupto"):
+            os.remove(archivo_local)
+            st.rerun()
+        st.stop()
+    
+    if df_h.empty:
+        st.warning("El archivo está vacío. Ejecuta una simulación.")
         st.stop()
     
     # Procesar fechas y hora
     df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
     if 'Hora' in df_h.columns:
-        # Limpiar la hora: si contiene fecha, extraer solo la hora
         df_h['Hora'] = df_h['Hora'].astype(str).str.split().str[-1]
-        # Si la hora tiene solo dos dígitos, completar con :00:00
         df_h['Hora'] = df_h['Hora'].apply(lambda x: x if len(x)==8 else "00:00:00")
     else:
         df_h['Hora'] = "00:00:00"
@@ -339,9 +303,7 @@ with tab2:
             df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
     df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
     
-    # -------------------------------------------------------------
-    # 3. KPIs
-    # -------------------------------------------------------------
+    # KPIs
     st.subheader("📌 Resumen global")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -357,59 +319,43 @@ with tab2:
     
     st.divider()
     
-    # -------------------------------------------------------------
-    # 4. Gráfico de líneas: Evolución de ataques
-    # -------------------------------------------------------------
+    # Gráfico de líneas: evolución de ataques
     st.subheader("📈 Evolución temporal de intrusiones")
     fig_line = px.line(
-        df_h,
-        x='Fecha',
-        y='Ataques',
-        markers=True,
+        df_h, x='Fecha', y='Ataques', markers=True,
         title="Ataques detectados a lo largo del tiempo",
         labels={'Ataques': 'Número de ataques', 'Fecha': 'Fecha'},
         line_shape='linear'
     )
     fig_line.update_traces(
-        line_color='#e74c3c',
-        line_width=2.5,
+        line_color='#e74c3c', line_width=2.5,
         marker=dict(size=10, symbol='square', color='#2980b9', line=dict(width=1, color='white')),
-        textposition='top center',
-        textfont_size=10
+        textposition='top center', textfont_size=10
     )
     if len(df_h) <= 20:
         fig_line.update_traces(text=df_h['Ataques'].apply(lambda x: str(x)), selector=dict(mode='lines+markers+text'))
     fig_line.update_layout(
         yaxis=dict(title="Ataques", gridcolor='lightgray', showgrid=True),
         xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
-        plot_bgcolor='white',
-        font=dict(size=12)
+        plot_bgcolor='white', font=dict(size=12)
     )
     st.plotly_chart(fig_line, use_container_width=True)
     
     st.divider()
     
-    # -------------------------------------------------------------
-    # 5. Tendencia de puertos (Top 5 por frecuencia)
-    # -------------------------------------------------------------
+    # Tendencia de puertos (Top 5)
     st.subheader("🔍 Tendencia de puertos atacados")
     puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
     puertos_counts.columns = ['Puerto', 'Frecuencia']
     fig_puertos = px.bar(
-        puertos_counts,
-        x='Puerto',
-        y='Frecuencia',
+        puertos_counts, x='Puerto', y='Frecuencia',
         title="Top 5 puertos más atacados en el historial",
-        color='Frecuencia',
-        color_continuous_scale='Reds',
-        text='Frecuencia'
+        color='Frecuencia', color_continuous_scale='Reds', text='Frecuencia'
     )
     fig_puertos.update_traces(textposition='outside')
     fig_puertos.update_layout(
-        xaxis_title="Puerto",
-        yaxis_title="Número de veces atacado",
-        plot_bgcolor='white',
-        font=dict(size=12)
+        xaxis_title="Puerto", yaxis_title="Número de veces atacado",
+        plot_bgcolor='white', font=dict(size=12)
     )
     st.plotly_chart(fig_puertos, use_container_width=True)
     
@@ -417,62 +363,43 @@ with tab2:
     if len(df_h) >= 3:
         st.subheader("📊 Evolución de puertos por fecha")
         df_puertos_time = df_h.groupby('Fecha')['Puerto'].value_counts().reset_index(name='count')
-        # Tomar solo los 3 puertos más frecuentes para no saturar
         top_puertos = df_h['Puerto'].value_counts().head(3).index.tolist()
         df_puertos_time = df_puertos_time[df_puertos_time['Puerto'].isin(top_puertos)]
         fig_puertos_time = px.line(
-            df_puertos_time,
-            x='Fecha',
-            y='count',
-            color='Puerto',
-            markers=True,
+            df_puertos_time, x='Fecha', y='count', color='Puerto', markers=True,
             title="Puertos objetivo a lo largo del tiempo (top 3)",
             labels={'count': 'Frecuencia', 'Fecha': 'Fecha'}
         )
-        fig_puertos_time.update_layout(
-            yaxis=dict(gridcolor='lightgray'),
-            plot_bgcolor='white',
-            font=dict(size=12)
-        )
+        fig_puertos_time.update_layout(yaxis=dict(gridcolor='lightgray'), plot_bgcolor='white', font=dict(size=12))
         st.plotly_chart(fig_puertos_time, use_container_width=True)
     
     st.divider()
     
-    # -------------------------------------------------------------
-    # 6. Evolución de la precisión (Accuracy) a lo largo del tiempo
-    # -------------------------------------------------------------
+    # Evolución de la precisión (Accuracy)
     if 'Accuracy' in df_h.columns and df_h['Accuracy'].notna().any():
         st.subheader("🎯 Evolución de la precisión del modelo")
         fig_acc = px.line(
-            df_h,
-            x='Fecha',
-            y='Accuracy',
-            markers=True,
+            df_h, x='Fecha', y='Accuracy', markers=True,
             title="Precisión (Accuracy) por simulación",
             labels={'Accuracy': 'Precisión', 'Fecha': 'Fecha'},
             line_shape='linear'
         )
         fig_acc.update_traces(
-            line_color='#2c3e50',
-            line_width=2,
+            line_color='#2c3e50', line_width=2,
             marker=dict(size=8, symbol='circle', color='#16a085'),
-            textposition='top center',
-            textfont_size=10
+            textposition='top center', textfont_size=10
         )
         if len(df_h) <= 20:
             fig_acc.update_traces(text=df_h['Accuracy'].apply(lambda x: f"{x:.2%}"), selector=dict(mode='lines+markers+text'))
         fig_acc.update_layout(
             yaxis=dict(title="Accuracy", gridcolor='lightgray', showgrid=True, tickformat=".0%"),
             xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
-            plot_bgcolor='white',
-            font=dict(size=12)
+            plot_bgcolor='white', font=dict(size=12)
         )
         st.plotly_chart(fig_acc, use_container_width=True)
         st.divider()
     
-    # -------------------------------------------------------------
-    # 7. Tabla detallada con todas las métricas (fecha y hora separados)
-    # -------------------------------------------------------------
+    # Tabla detallada
     st.subheader("📋 Registro detallado de todas las simulaciones")
     columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
                 'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
@@ -480,15 +407,12 @@ with tab2:
         if col not in df_h.columns:
             df_h[col] = np.nan
     df_display = df_h.copy()
-    # Formatear fecha como string YYYY-MM-DD
     df_display['Fecha'] = df_display['Fecha'].dt.date
-    # Formatear hora (asegurar dos puntos)
     df_display['Hora'] = df_display['Hora'].astype(str).str[:8]
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_display.columns:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
     st.dataframe(df_display[columnas], use_container_width=True, height=400)
-    
     # Nota: Los reportes descargables están en la Pestaña 3
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
