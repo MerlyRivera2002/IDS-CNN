@@ -185,6 +185,16 @@ with tab2:
         
         st.divider()
         st.subheader("📋 Registros Históricos")
-        st.dataframe(df_h[['Fecha', 'Archivo', 'Total_Registros', 'Ataques_Detectados', 'Puerto_Critico']], use_container_width=True)
-    else:
-        st.info("Aún no hay datos en la bitácora. Realiza un monitoreo en la Pestaña 1.")
+        
+        # Lista de columnas que QUEREMOS mostrar
+        cols_deseadas = ['Fecha', 'Archivo', 'Total_Registros', 'Ataques_Detectados', 'Puerto_Critico']
+        
+        # Filtramos solo las que DE VERDAD existen en el archivo para evitar el KeyError
+        cols_reales = [c for c in cols_deseadas if c in df_h.columns]
+        
+        if len(cols_reales) > 0:
+            st.dataframe(df_h[cols_reales], use_container_width=True)
+        else:
+            # Si no encuentra ninguna, muestra todo el dataframe para que veas qué nombres tienen
+            st.write("Mostrando todas las columnas disponibles:")
+            st.dataframe(df_h, use_container_width=True)
