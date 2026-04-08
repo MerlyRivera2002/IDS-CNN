@@ -324,8 +324,16 @@ with tab2:
         st.warning("No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
         st.stop()
     
-    # Procesar fechas y ordenar
+    # Procesar fechas y hora
     df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
+    if 'Hora' in df_h.columns:
+        # Limpiar la hora: si contiene fecha, extraer solo la hora
+        df_h['Hora'] = df_h['Hora'].astype(str).str.split().str[-1]
+        # Si la hora tiene solo dos dígitos, completar con :00:00
+        df_h['Hora'] = df_h['Hora'].apply(lambda x: x if len(x)==8 else "00:00:00")
+    else:
+        df_h['Hora'] = "00:00:00"
+    
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_h.columns:
             df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
@@ -350,7 +358,7 @@ with tab2:
     st.divider()
     
     # -------------------------------------------------------------
-    # 4. Gráfico de líneas (evolución de ataques)
+    # 4. Gráfico de líneas: Evolución de ataques
     # -------------------------------------------------------------
     st.subheader("📈 Evolución temporal de intrusiones")
     fig_line = px.line(
@@ -382,7 +390,88 @@ with tab2:
     st.divider()
     
     # -------------------------------------------------------------
-    # 5. Tabla detallada con todas las métricas
+    # 5. Tendencia de puertos (Top 5 por frecuencia)
+    # -------------------------------------------------------------
+    st.subheader("🔍 Tendencia de puertos atacados")
+    puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
+    puertos_counts.columns = ['Puerto', 'Frecuencia']
+    fig_puertos = px.bar(
+        puertos_counts,
+        x='Puerto',
+        y='Frecuencia',
+        title="Top 5 puertos más atacados en el historial",
+        color='Frecuencia',
+        color_continuous_scale='Reds',
+        text='Frecuencia'
+    )
+    fig_puertos.update_traces(textposition='outside')
+    fig_puertos.update_layout(
+        xaxis_title="Puerto",
+        yaxis_title="Número de veces atacado",
+        plot_bgcolor='white',
+        font=dict(size=12)
+    )
+    st.plotly_chart(fig_puertos, use_container_width=True)
+    
+    # Evolución de puertos por fecha (si hay suficientes datos)
+    if len(df_h) >= 3:
+        st.subheader("📊 Evolución de puertos por fecha")
+        df_puertos_time = df_h.groupby('Fecha')['Puerto'].value_counts().reset_index(name='count')
+        # Tomar solo los 3 puertos más frecuentes para no saturar
+        top_puertos = df_h['Puerto'].value_counts().head(3).index.tolist()
+        df_puertos_time = df_puertos_time[df_puertos_time['Puerto'].isin(top_puertos)]
+        fig_puertos_time = px.line(
+            df_puertos_time,
+            x='Fecha',
+            y='count',
+            color='Puerto',
+            markers=True,
+            title="Puertos objetivo a lo largo del tiempo (top 3)",
+            labels={'count': 'Frecuencia', 'Fecha': 'Fecha'}
+        )
+        fig_puertos_time.update_layout(
+            yaxis=dict(gridcolor='lightgray'),
+            plot_bgcolor='white',
+            font=dict(size=12)
+        )
+        st.plotly_chart(fig_puertos_time, use_container_width=True)
+    
+    st.divider()
+    
+    # -------------------------------------------------------------
+    # 6. Evolución de la precisión (Accuracy) a lo largo del tiempo
+    # -------------------------------------------------------------
+    if 'Accuracy' in df_h.columns and df_h['Accuracy'].notna().any():
+        st.subheader("🎯 Evolución de la precisión del modelo")
+        fig_acc = px.line(
+            df_h,
+            x='Fecha',
+            y='Accuracy',
+            markers=True,
+            title="Precisión (Accuracy) por simulación",
+            labels={'Accuracy': 'Precisión', 'Fecha': 'Fecha'},
+            line_shape='linear'
+        )
+        fig_acc.update_traces(
+            line_color='#2c3e50',
+            line_width=2,
+            marker=dict(size=8, symbol='circle', color='#16a085'),
+            textposition='top center',
+            textfont_size=10
+        )
+        if len(df_h) <= 20:
+            fig_acc.update_traces(text=df_h['Accuracy'].apply(lambda x: f"{x:.2%}"), selector=dict(mode='lines+markers+text'))
+        fig_acc.update_layout(
+            yaxis=dict(title="Accuracy", gridcolor='lightgray', showgrid=True, tickformat=".0%"),
+            xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
+            plot_bgcolor='white',
+            font=dict(size=12)
+        )
+        st.plotly_chart(fig_acc, use_container_width=True)
+        st.divider()
+    
+    # -------------------------------------------------------------
+    # 7. Tabla detallada con todas las métricas (fecha y hora separados)
     # -------------------------------------------------------------
     st.subheader("📋 Registro detallado de todas las simulaciones")
     columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
@@ -391,6 +480,10 @@ with tab2:
         if col not in df_h.columns:
             df_h[col] = np.nan
     df_display = df_h.copy()
+    # Formatear fecha como string YYYY-MM-DD
+    df_display['Fecha'] = df_display['Fecha'].dt.date
+    # Formatear hora (asegurar dos puntos)
+    df_display['Hora'] = df_display['Hora'].astype(str).str[:8]
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_display.columns:
             df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
