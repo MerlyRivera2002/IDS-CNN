@@ -261,9 +261,14 @@ with tab1:
         st.warning("🔒 Solo Administradores.")
 # =====================================================================
 # PESTAÑA 2: ANÁLISIS Y TENDENCIAS (solo KPIs, gráficas históricas, tabla global)
+
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
-    
+
+    if os.path.exists("historial.csv"):
+    st.success("✅ El archivo EXISTE en el servidor")
+else:
+    st.error("❌ El archivo NO EXISTE en el servidor")
     import requests, base64, io
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     # Configura aquí tus datos de GitHub (los mismos que usas en logic.py)
