@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 
+# En logic.py
 def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, fecha_simulada, puerto_top, acc):
-    """Guarda los resultados. Ahora incluye cálculo de normales para la tabla maestra."""
     normales = total - ataques
     nuevo_registro = pd.DataFrame([{
         "Fecha": str(fecha_simulada),
@@ -16,7 +16,8 @@ def guardar_en_historial(archivo_hist, nombre_dataset, total, ataques, tiempo, f
         "Accuracy": round(float(acc), 4)
     }])
     
-    if not os.path.isfile(archivo_hist) or os.path.getsize(archivo_hist) == 0:
+    # Esto crea el archivo si no existe
+    if not os.path.isfile(archivo_hist):
         nuevo_registro.to_csv(archivo_hist, index=False)
     else:
         nuevo_registro.to_csv(archivo_hist, mode='a', header=False, index=False)
