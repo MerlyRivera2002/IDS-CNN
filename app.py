@@ -265,93 +265,19 @@ with tab1:
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
     
-    # Verificar existencia del archivo
+    with tab2:
+    st.header("📈 Análisis histórico y tendencias")
+    
     import os
     if os.path.exists("historial.csv"):
-        st.success("✅ El archivo EXISTE en el servidor")
-        st.write(f"Tamaño: {os.path.getsize('historial.csv')} bytes")
+        st.warning("⚠️ El archivo historial.csv existe pero parece estar corrupto.")
+        if st.button("🗑️ Borrar archivo corrupto"):
+            os.remove("historial.csv")
+            st.success("Archivo eliminado. Ejecuta una nueva simulación en la Pestaña 1.")
+            st.rerun()
+        st.stop()
     else:
-        st.error("❌ El archivo NO EXISTE en el servidor")
-    
-    # Leer datos (desde GitHub o local)
-    import requests, base64, io
-    github_token = st.secrets.get("GITHUB_TOKEN", None)
-    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CÁMBIALO
-    REPO_NAME = "TU_REPOSITORIO"       # <-- CÁMBIALO
-    FILE_PATH = "historial.csv"
-    
-    df_h = None
-    if github_token:
-        try:
-            url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-            headers = {"Authorization": f"token {github_token}"}
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                file_data = response.json()
-                content = base64.b64decode(file_data['content']).decode('utf-8')
-                df_h = pd.read_csv(io.StringIO(content))
-                st.success("✅ Datos cargados desde GitHub")
-        except:
-            pass
-    
-    if df_h is None and os.path.exists("historial.csv"):
-        try:
-            df_h = pd.read_csv("historial.csv")
-            st.info("Datos cargados desde archivo local")
-        except:
-            st.error("Error al leer archivo local")
-    
-    if df_h is not None and not df_h.empty:
-        df_h['Fecha'] = pd.to_datetime(df_h['Fecha'])
-        for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-            if col in df_h.columns:
-                df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
-        df_h = df_h.sort_values('Fecha')
-        
-        # KPIs
-        st.subheader("📌 Resumen global")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1: st.metric("Total simulaciones", len(df_h))
-        with col2: st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
-        with col3:
-            avg_acc = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
-            st.metric("Precisión promedio", f"{avg_acc:.2%}" if pd.notna(avg_acc) else "N/A")
-        with col4:
-            puerto_top = df_h.loc[df_h['Ataques'].idxmax(), 'Puerto'] if not df_h.empty else "N/A"
-            st.metric("Puerto más atacado", puerto_top)
-        
-        st.divider()
-        
-        # Gráficas
-        st.subheader("📈 Evolución temporal")
-        c1, c2 = st.columns(2)
-        with c1:
-            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, title="Evolución de intrusiones detectadas")
-            fig1.update_traces(line_color='#e74c3c', line_width=2.5, marker=dict(size=10, symbol='square', color='#2980b9'))
-            fig1.update_layout(yaxis=dict(gridcolor='lightgray'), plot_bgcolor='white')
-            st.plotly_chart(fig1, use_container_width=True)
-        with c2:
-            puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
-            puertos_counts.columns = ['Puerto', 'Frecuencia']
-            fig_puertos = px.bar(puertos_counts, x='Puerto', y='Frecuencia', color='Frecuencia', color_continuous_scale='Reds')
-            st.plotly_chart(fig_puertos, use_container_width=True)
-        
-        st.divider()
-        
-        # Tabla
-        st.subheader("📋 Registro detallado")
-        columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques', 'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
-        for col in columnas:
-            if col not in df_h.columns:
-                df_h[col] = np.nan
-        df_display = df_h.copy()
-        for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-            if col in df_display.columns:
-                df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-        st.dataframe(df_display[columnas], use_container_width=True, height=400)
-    else:
-        st.info("💡 No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
-
+        st.info("No hay archivo de historial. Ejecuta una simulación en la Pestaña 1.")
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
 # =====================================================================
