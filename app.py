@@ -265,19 +265,138 @@ with tab1:
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
     
-    with tab2:
-    st.header("📈 Análisis histórico y tendencias")
-    
     import os
-    if os.path.exists("historial.csv"):
-        st.warning("⚠️ El archivo historial.csv existe pero parece estar corrupto.")
-        if st.button("🗑️ Borrar archivo corrupto"):
-            os.remove("historial.csv")
-            st.success("Archivo eliminado. Ejecuta una nueva simulación en la Pestaña 1.")
-            st.rerun()
+    import requests
+    import base64
+    import io
+    import pandas as pd
+    import numpy as np
+    import plotly.express as px
+    
+    # -------------------------------------------------------------
+    # 1. Verificar y limpiar archivo corrupto
+    # -------------------------------------------------------------
+    archivo_local = "historial.csv"
+    if os.path.exists(archivo_local):
+        try:
+            pd.read_csv(archivo_local)
+        except Exception as e:
+            st.error(f"❌ Archivo local corrupto: {e}")
+            if st.button("🗑️ Borrar archivo corrupto"):
+                os.remove(archivo_local)
+                st.success("Archivo eliminado. Recarga la página.")
+                st.rerun()
+            st.stop()
+    
+    # -------------------------------------------------------------
+    # 2. Cargar datos desde GitHub (prioritario) o local
+    # -------------------------------------------------------------
+    df_h = None
+    github_token = st.secrets.get("GITHUB_TOKEN", None)
+    REPO_OWNER = "TU_USUARIO_GITHUB"   # <-- CÁMBIALO
+    REPO_NAME = "TU_REPOSITORIO"       # <-- CÁMBIALO
+    FILE_PATH = "historial.csv"
+    
+    if github_token:
+        try:
+            url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+            headers = {"Authorization": f"token {github_token}"}
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                file_data = response.json()
+                content = base64.b64decode(file_data['content']).decode('utf-8')
+                df_h = pd.read_csv(io.StringIO(content))
+                st.success("✅ Datos cargados desde GitHub")
+            else:
+                st.warning(f"No se encontró archivo en GitHub (código {response.status_code}). Usando archivo local.")
+        except Exception as e:
+            st.warning(f"Error al leer GitHub: {e}. Usando archivo local.")
+    
+    if df_h is None and os.path.exists(archivo_local):
+        try:
+            df_h = pd.read_csv(archivo_local)
+            st.info("Datos cargados desde archivo local")
+        except Exception as e:
+            st.error(f"Error al leer archivo local: {e}")
+            st.stop()
+    
+    if df_h is None or df_h.empty:
+        st.warning("No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
         st.stop()
-    else:
-        st.info("No hay archivo de historial. Ejecuta una simulación en la Pestaña 1.")
+    
+    # Procesar fechas y ordenar
+    df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
+    for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
+        if col in df_h.columns:
+            df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
+    df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
+    
+    # -------------------------------------------------------------
+    # 3. KPIs
+    # -------------------------------------------------------------
+    st.subheader("📌 Resumen global")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total simulaciones", len(df_h))
+    with col2:
+        st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
+    with col3:
+        avg_acc = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
+        st.metric("Precisión promedio", f"{avg_acc:.2%}" if pd.notna(avg_acc) else "N/A")
+    with col4:
+        puerto_top = df_h.loc[df_h['Ataques'].idxmax(), 'Puerto'] if not df_h.empty else "N/A"
+        st.metric("Puerto más atacado", puerto_top)
+    
+    st.divider()
+    
+    # -------------------------------------------------------------
+    # 4. Gráfico de líneas (evolución de ataques)
+    # -------------------------------------------------------------
+    st.subheader("📈 Evolución temporal de intrusiones")
+    fig_line = px.line(
+        df_h,
+        x='Fecha',
+        y='Ataques',
+        markers=True,
+        title="Ataques detectados a lo largo del tiempo",
+        labels={'Ataques': 'Número de ataques', 'Fecha': 'Fecha'},
+        line_shape='linear'
+    )
+    fig_line.update_traces(
+        line_color='#e74c3c',
+        line_width=2.5,
+        marker=dict(size=10, symbol='square', color='#2980b9', line=dict(width=1, color='white')),
+        textposition='top center',
+        textfont_size=10
+    )
+    if len(df_h) <= 20:
+        fig_line.update_traces(text=df_h['Ataques'].apply(lambda x: str(x)), selector=dict(mode='lines+markers+text'))
+    fig_line.update_layout(
+        yaxis=dict(title="Ataques", gridcolor='lightgray', showgrid=True),
+        xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
+        plot_bgcolor='white',
+        font=dict(size=12)
+    )
+    st.plotly_chart(fig_line, use_container_width=True)
+    
+    st.divider()
+    
+    # -------------------------------------------------------------
+    # 5. Tabla detallada con todas las métricas
+    # -------------------------------------------------------------
+    st.subheader("📋 Registro detallado de todas las simulaciones")
+    columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
+                'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+    for col in columnas:
+        if col not in df_h.columns:
+            df_h[col] = np.nan
+    df_display = df_h.copy()
+    for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
+    st.dataframe(df_display[columnas], use_container_width=True, height=400)
+    
+    # Nota: Los reportes descargables están en la Pestaña 3
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
 # =====================================================================
