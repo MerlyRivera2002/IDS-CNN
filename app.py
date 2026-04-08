@@ -207,41 +207,54 @@ ya esta falta el rsto pero esa esta!!
  
 
 # ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
+# ----------------------------------------- PESTAÑA 2 -----------------------------------------------------------
 with tab2:
     st.header("📊 Inteligencia de Red y Toma de Decisiones")
+    
+    # 1. Cargar datos desde el historial
     df_h = logic.obtener_metricas_resumen("historial.csv")
     
     if df_h is not None and not df_h.empty:
+        # 2. GRÁFICAS DE TENDENCIA (IGUALES A TU DIBUJO)
         col_g1, col_g2 = st.columns(2)
+        
         with col_g1:
-            st.subheader("📈 Tendencia de Ataques")
-            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True)
-            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10))
+            st.subheader("📈 Tendencia de Intrusiones")
+            fig1 = px.line(df_h, x='Fecha', y='Ataques', markers=True, title="Ataques Detectados por Fecha")
+            fig1.update_traces(line_color='#e74c3c', marker=dict(size=10, symbol='circle'))
             st.plotly_chart(fig1, use_container_width=True)
+            
         with col_g2:
             st.subheader("📈 Tendencia de Puertos")
-            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True)
-            fig2.update_traces(line_color='#3498db', marker=dict(size=10))
+            fig2 = px.line(df_h, x='Fecha', y='Puerto', markers=True, title="Evolución de Puertos Críticos")
+            fig2.update_traces(line_color='#3498db', marker=dict(size=10, symbol='square'))
             st.plotly_chart(fig2, use_container_width=True)
 
         st.divider()
-        st.subheader("📋 Matriz de Referencia Técnica (Capítulo 4)")
-        df_mostrar = df_h.copy()
-        if 'Accuracy' in df_mostrar.columns:
-            df_mostrar['Accuracy'] = df_mostrar['Accuracy'].apply(lambda x: f"{x:.2%}")
-        st.dataframe(df_mostrar, use_container_width=True)
 
-        st.subheader("💡 Análisis para Toma de Decisiones")
-        p_frecuente = df_h['Puerto'].mode()[0]
-        acc_promedio = df_h['Accuracy'].mean()
-        st.info(f"""
-        **Sugerencias automáticas para tu tesis:**
-        1. **Filtro de Red:** Se recomienda priorizar el monitoreo en el **{p_frecuente}** por su alta recurrencia.
-        2. **Rendimiento:** El modelo mantiene un Accuracy promedio del **{acc_promedio:.2%}**.
-        """)
+        # 3. TABLA MAESTRA (REFERENCIA CAPÍTULO 4)
+        st.subheader("📋 Matriz de Datos para Toma de Decisiones")
+        df_ver = df_h.copy()
+        if 'Accuracy' in df_ver.columns:
+            df_ver['Accuracy'] = df_ver['Accuracy'].apply(lambda x: f"{x:.2%}")
         
-        if st.button("🗑️ Resetear Todo el Historial"):
-            if os.path.exists("historial.csv"): os.remove("historial.csv")
-            st.rerun()
+        st.dataframe(df_ver, use_container_width=True)
+
+        # 4. TOMA DE DECISIONES AUTOMÁTICA
+        st.subheader("💡 Recomendaciones Basadas en Tendencias")
+        puerto_top = df_h['Puerto'].mode()[0]
+        acc_prom = df_h['Accuracy'].mean()
+        
+        st.info(f"""
+        **Análisis para la Tesis:**
+        * El sistema identifica una vulnerabilidad recurrente en el **{puerto_top}**.
+        * El modelo CNN mantiene una confiabilidad promedio del **{acc_prom:.2%}**.
+        * Se sugiere reforzar las reglas de firewall para el puerto con mayor pico de ataques.
+        """)
+
+        if st.button("🗑️ Resetear Bitácora"):
+            if os.path.exists("historial.csv"):
+                os.remove("historial.csv")
+                st.rerun()
     else:
-        st.info("No hay datos históricos. Realiza una simulación en la Pestaña 1.")
+        st.info("No hay datos históricos. Por favor, realiza una simulación en la Pestaña 1.")
