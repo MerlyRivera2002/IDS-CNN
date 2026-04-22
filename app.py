@@ -347,21 +347,24 @@ with tab2:
 
 puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
 
-fig_puertos = px.bar(
+puertos_counts.columns = ['Puerto', 'Frecuencia']
+
+fig_puertos = px.line(
     puertos_counts,
     x='Puerto',
     y='Frecuencia',
-    title="Top 5 puertos más atacados en el historial",
-    color='Frecuencia',
-    color_continuous_scale='Reds',
-    text='Frecuencia'
+    markers=True,
+    title="Tendencia de los puertos más atacados"
 )
-    fig_puertos.update_traces(textposition='outside')
-    fig_puertos.update_layout(
-        xaxis_title="Puerto", yaxis_title="Número de veces atacado",
-        plot_bgcolor='white', font=dict(size=12)
-    )
-    st.plotly_chart(fig_puertos, use_container_width=True)
+
+fig_puertos.update_layout(
+    xaxis_title="Puerto",
+    yaxis_title="Número de ataques",
+    plot_bgcolor='white',
+    font=dict(size=12)
+)
+
+st.plotly_chart(fig_puertos, use_container_width=True)
     
     # Evolución de puertos por fecha (si hay suficientes datos)
     if len(df_h) >= 3:
@@ -382,8 +385,7 @@ fig_puertos = px.bar(
     # ==========================================================
 # MÉTRICAS GLOBALES DEL MODELO (GENERAL DEL HISTORIAL)
 # ==========================================================
-
-st.subheader("📊 Métricas globales del modelo")
+    st.subheader("📊 Métricas globales del modelo")
 
 # Calcular promedios globales
 acc_global = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
