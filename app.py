@@ -109,7 +109,7 @@ with tab1:
                     for idx, inicio in enumerate(range(0, total_registros, 15)):
                         chunk = df_clean.iloc[inicio: inicio+15]
                         X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
-                        chunk_preds = (model.predict(X_chunk, verbose=0) > 0.5).astype(int).flatten()
+                        chunk_preds = (model.predict(X_chunk, verbose=0) > 0.6).astype(int).flatten()   #-----pred cambio ----
                         preds_totales.extend(chunk_preds)
                         
                         ataques = sum(preds_totales)
