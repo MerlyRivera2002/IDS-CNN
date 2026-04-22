@@ -369,7 +369,7 @@ with tab2:
     st.divider()
     
     # ==========================================================
-    # TENDENCIA DE PUERTOS (CORREGIDO)
+    # TENDENCIA DE PUERTOS 
     # ==========================================================
     
     st.subheader("🔍 Tendencia de puertos atacados")
@@ -446,42 +446,40 @@ with tab2:
     
     # ==========================================================
     # MÉTRICAS GLOBALES
-    # ==========================================================
-    
-    st.subheader("📊 Métricas globales del modelo")
-    
-    acc_global = df_h['Accuracy'].mean()
-    prec_global = df_h['Precision'].mean()
-    rec_global = df_h['Recall'].mean()
-    f1_global = df_h['F1'].mean()
-    
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    
-    with col_m1:
-        st.metric(
-            "Accuracy global",
-            f"{acc_global:.2%}"
-        )
-    
-    with col_m2:
-        st.metric(
-            "Precision global",
-            f"{prec_global:.2%}"
-        )
-    
-    with col_m3:
-        st.metric(
-            "Recall global",
-            f"{rec_global:.2%}"
-        )
-    
-    with col_m4:
-        st.metric(
-            "F1-Score global",
-            f"{f1_global:.2%}"
-        )
-    
-    st.divider()
+
+    st.subheader("📈 Visualización individual de métricas")
+
+# Selector de métrica
+metrica_seleccionada = st.selectbox(
+    "Seleccionar métrica para visualizar:",
+    ["Accuracy", "Precision", "Recall", "F1"]
+)
+
+# Crear gráfico dinámico
+fig_individual = px.line(
+    df_h,
+    x='Fecha',
+    y=metrica_seleccionada,
+    markers=True,
+    title=f"Evolución de {metrica_seleccionada}"
+)
+
+fig_individual.update_layout(
+    yaxis=dict(
+        title=metrica_seleccionada,
+        tickformat=".0%",
+        gridcolor='lightgray'
+    ),
+    xaxis=dict(
+        title="Fecha",
+        tickformat="%b %Y",
+        tickangle=-45
+    ),
+    plot_bgcolor='white',
+    font=dict(size=13)
+)
+
+st.plotly_chart(fig_individual, use_container_width=True)
     
     # ==========================================================
     # MATRIZ GLOBAL
