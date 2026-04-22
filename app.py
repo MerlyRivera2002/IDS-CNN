@@ -445,85 +445,85 @@ with tab2:
     st.divider()
     
     # ==========================================================
-# MÉTRICAS GLOBALES
-# ==========================================================
-
+    # MÉTRICAS GLOBALES
+    # ==========================================================
+    
     st.subheader("📊 Métricas globales del modelo")
 
-# Calcular métricas globales
-acc_global = df_h['Accuracy'].mean()
-prec_global = df_h['Precision'].mean()
-rec_global = df_h['Recall'].mean()
-f1_global = df_h['F1'].mean()
+    # Calcular métricas globales
+    acc_global = df_h['Accuracy'].mean()
+    prec_global = df_h['Precision'].mean()
+    rec_global = df_h['Recall'].mean()
+    f1_global = df_h['F1'].mean()
 
-# Mostrar métricas numéricas
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    # Mostrar métricas numéricas
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
 
-with col_m1:
-    st.metric(
-        "Accuracy global",
-        f"{acc_global:.2%}"
+    with col_m1:
+        st.metric(
+            "Accuracy global",
+            f"{acc_global:.2%}"
+        )
+
+    with col_m2:
+        st.metric(
+            "Precision global",
+            f"{prec_global:.2%}"
+        )
+
+    with col_m3:
+        st.metric(
+            "Recall global",
+            f"{rec_global:.2%}"
+        )
+
+    with col_m4:
+        st.metric(
+            "F1-Score global",
+            f"{f1_global:.2%}"
+        )
+
+    st.divider()
+
+    # ==========================================================
+    # GRÁFICO DINÁMICO POR MÉTRICA
+    # ==========================================================
+
+    st.subheader("📈 Visualización individual de métricas")
+
+    metrica_seleccionada = st.selectbox(
+        "Seleccionar métrica:",
+        ["Accuracy", "Precision", "Recall", "F1"]
     )
 
-with col_m2:
-    st.metric(
-        "Precision global",
-        f"{prec_global:.2%}"
+    fig_individual = px.line(
+        df_h,
+        x='Fecha',
+        y=metrica_seleccionada,
+        markers=True,
+        title=f"Evolución de {metrica_seleccionada}"
     )
 
-with col_m3:
-    st.metric(
-        "Recall global",
-        f"{rec_global:.2%}"
+    fig_individual.update_layout(
+        yaxis=dict(
+            title=metrica_seleccionada,
+            tickformat=".0%",
+            gridcolor='lightgray'
+        ),
+        xaxis=dict(
+            title="Fecha",
+            tickformat="%b %Y",
+            tickangle=-45
+        ),
+        plot_bgcolor='white'
     )
 
-with col_m4:
-    st.metric(
-        "F1-Score global",
-        f"{f1_global:.2%}"
+    st.plotly_chart(
+        fig_individual,
+        use_container_width=True
     )
 
-st.divider()
-
-# ==========================================================
-# GRÁFICO DINÁMICO POR MÉTRICA
-# ==========================================================
-
-st.subheader("📈 Visualización individual de métricas")
-
-metrica_seleccionada = st.selectbox(
-    "Seleccionar métrica:",
-    ["Accuracy", "Precision", "Recall", "F1"]
-)
-
-fig_individual = px.line(
-    df_h,
-    x='Fecha',
-    y=metrica_seleccionada,
-    markers=True,
-    title=f"Evolución de {metrica_seleccionada}"
-)
-
-fig_individual.update_layout(
-    yaxis=dict(
-        title=metrica_seleccionada,
-        tickformat=".0%",
-        gridcolor='lightgray'
-    ),
-    xaxis=dict(
-        title="Fecha",
-        tickformat="%b %Y",
-        tickangle=-45
-    ),
-    plot_bgcolor='white'
-)
-
-st.plotly_chart(
-    fig_individual,
-    use_container_width=True
-)
-
-st.divider()
+    st.divider()
     
     # ==========================================================
     # TABLA FINAL
