@@ -259,8 +259,8 @@ with tab1:
             pass
     else:
         st.warning("🔒 Solo Administradores.")
-# =====================================================================
-# PESTAÑA 2: ANÁLISIS Y TENDENCIAS (solo KPIs, gráficas históricas, tabla global)
+
+# --------------------------------------PESTAÑA 2: ANÁLISIS Y TENDENCIAS -----------------------------------------------------------
 
 with tab2:
     st.header("📈 Análisis histórico y tendencias")
@@ -292,198 +292,276 @@ with tab2:
     
     # Procesar fechas y hora
     df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
+    
     if 'Hora' in df_h.columns:
         df_h['Hora'] = df_h['Hora'].astype(str).str.split().str[-1]
-        df_h['Hora'] = df_h['Hora'].apply(lambda x: x if len(x)==8 else "00:00:00")
+        df_h['Hora'] = df_h['Hora'].apply(
+            lambda x: x if len(x) == 8 else "00:00:00"
+        )
     else:
         df_h['Hora'] = "00:00:00"
     
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_h.columns:
             df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
+    
     df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
     
     # KPIs
     st.subheader("📌 Resumen global")
+    
     col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
         st.metric("Total simulaciones", len(df_h))
+    
     with col2:
-        st.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
+        st.metric(
+            "Total ataques detectados",
+            f"{df_h['Ataques'].sum():,}"
+        )
+    
     with col3:
-        avg_acc = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
-        st.metric("Precisión promedio", f"{avg_acc:.2%}" if pd.notna(avg_acc) else "N/A")
+        avg_acc = df_h['Accuracy'].mean()
+        st.metric(
+            "Precisión promedio",
+            f"{avg_acc:.2%}"
+        )
+    
     with col4:
-        puerto_top = df_h.loc[df_h['Ataques'].idxmax(), 'Puerto'] if not df_h.empty else "N/A"
-        st.metric("Puerto más atacado", puerto_top)
+        puerto_top = df_h.loc[
+            df_h['Ataques'].idxmax(),
+            'Puerto'
+        ]
+        st.metric(
+            "Puerto más atacado",
+            puerto_top
+        )
     
     st.divider()
     
-    # Gráfico de líneas: evolución de ataques
+    # Evolución temporal
     st.subheader("📈 Evolución temporal de intrusiones")
+    
     fig_line = px.line(
-        df_h, x='Fecha', y='Ataques', markers=True,
-        title="Ataques detectados a lo largo del tiempo",
-        labels={'Ataques': 'Número de ataques', 'Fecha': 'Fecha'},
-        line_shape='linear'
+        df_h,
+        x='Fecha',
+        y='Ataques',
+        markers=True,
+        title="Ataques detectados a lo largo del tiempo"
     )
-    fig_line.update_traces(
-        line_color='#e74c3c', line_width=2.5,
-        marker=dict(size=10, symbol='square', color='#2980b9', line=dict(width=1, color='white')),
-        textposition='top center', textfont_size=10
-    )
-    if len(df_h) <= 20:
-        fig_line.update_traces(text=df_h['Ataques'].apply(lambda x: str(x)), selector=dict(mode='lines+markers+text'))
+    
     fig_line.update_layout(
-        yaxis=dict(title="Ataques", gridcolor='lightgray', showgrid=True),
-        xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
-        plot_bgcolor='white', font=dict(size=12)
+        yaxis=dict(
+            title="Ataques",
+            gridcolor='lightgray'
+        ),
+        xaxis=dict(
+            title="Fecha",
+            tickformat="%b %Y",
+            tickangle=-45
+        ),
+        plot_bgcolor='white'
     )
+    
     st.plotly_chart(fig_line, use_container_width=True)
     
     st.divider()
     
-    st.subheader("🔍 Tendencia de puertos atacados")
-
-puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
-
-puertos_counts.columns = ['Puerto', 'Frecuencia']
-
-fig_puertos = px.line(
-    puertos_counts,
-    x='Puerto',
-    y='Frecuencia',
-    markers=True,
-    title="Tendencia de los puertos más atacados"
-)
-
-fig_puertos.update_layout(
-    xaxis_title="Puerto",
-    yaxis_title="Número de ataques",
-    plot_bgcolor='white',
-    font=dict(size=12)
-)
-
-st.plotly_chart(fig_puertos, use_container_width=True)
+    # ==========================================================
+    # TENDENCIA DE PUERTOS (CORREGIDO)
+    # ==========================================================
     
-    # Evolución de puertos por fecha (si hay suficientes datos)
+    st.subheader("🔍 Tendencia de puertos atacados")
+    
+    puertos_counts = (
+        df_h['Puerto']
+        .value_counts()
+        .head(5)
+        .reset_index()
+    )
+    
+    puertos_counts.columns = [
+        'Puerto',
+        'Frecuencia'
+    ]
+    
+    fig_puertos = px.line(
+        puertos_counts,
+        x='Puerto',
+        y='Frecuencia',
+        markers=True,
+        title="Tendencia de los puertos más atacados"
+    )
+    
+    fig_puertos.update_layout(
+        xaxis_title="Puerto",
+        yaxis_title="Número de ataques",
+        plot_bgcolor='white'
+    )
+    
+    st.plotly_chart(fig_puertos, use_container_width=True)
+    
+    # ==========================================================
+    # EVOLUCIÓN DE PUERTOS POR FECHA
+    # ==========================================================
+    
     if len(df_h) >= 3:
+        
         st.subheader("📊 Evolución de puertos por fecha")
-        df_puertos_time = df_h.groupby('Fecha')['Puerto'].value_counts().reset_index(name='count')
-        top_puertos = df_h['Puerto'].value_counts().head(3).index.tolist()
-        df_puertos_time = df_puertos_time[df_puertos_time['Puerto'].isin(top_puertos)]
-        fig_puertos_time = px.line(
-            df_puertos_time, x='Fecha', y='count', color='Puerto', markers=True,
-            title="Puertos objetivo a lo largo del tiempo (top 3)",
-            labels={'count': 'Frecuencia', 'Fecha': 'Fecha'}
+        
+        df_puertos_time = (
+            df_h
+            .groupby('Fecha')['Puerto']
+            .value_counts()
+            .reset_index(name='count')
         )
-        fig_puertos_time.update_layout(yaxis=dict(gridcolor='lightgray'), plot_bgcolor='white', font=dict(size=12))
-        st.plotly_chart(fig_puertos_time, use_container_width=True)
+        
+        top_puertos = (
+            df_h['Puerto']
+            .value_counts()
+            .head(3)
+            .index
+            .tolist()
+        )
+        
+        df_puertos_time = df_puertos_time[
+            df_puertos_time['Puerto'].isin(top_puertos)
+        ]
+        
+        fig_puertos_time = px.line(
+            df_puertos_time,
+            x='Fecha',
+            y='count',
+            color='Puerto',
+            markers=True
+        )
+        
+        st.plotly_chart(
+            fig_puertos_time,
+            use_container_width=True
+        )
     
     st.divider()
     
     # ==========================================================
-# MÉTRICAS GLOBALES DEL MODELO (GENERAL DEL HISTORIAL)
-# ==========================================================
+    # MÉTRICAS GLOBALES
+    # ==========================================================
+    
     st.subheader("📊 Métricas globales del modelo")
-
-# Calcular promedios globales
-acc_global = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
-prec_global = df_h['Precision'].mean() if 'Precision' in df_h else 0
-rec_global = df_h['Recall'].mean() if 'Recall' in df_h else 0
-f1_global = df_h['F1'].mean() if 'F1' in df_h else 0
-
-# Mostrar métricas numéricas
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-
-with col_m1:
-    st.metric("🎯 Accuracy global", f"{acc_global:.2%}")
-
-with col_m2:
-    st.metric("🎯 Precision global", f"{prec_global:.2%}")
-
-with col_m3:
-    st.metric("🎯 Recall global", f"{rec_global:.2%}")
-
-with col_m4:
-    st.metric("🎯 F1-Score global", f"{f1_global:.2%}")
-
-st.divider()
-
-# ==========================================================
-# MATRIZ DE CONFUSIÓN GLOBAL APROXIMADA
-# ==========================================================
-
-st.subheader("📊 Matriz de confusión global del modelo")
-
-# Aproximación usando promedios históricos
-# (válida cuando se almacenan métricas por simulación)
-
-# Tomar valores promedio
-accuracy = acc_global
-recall = rec_global
-precision = prec_global
-
-# Estimar valores base
-total_global = df_h['Total'].sum()
-ataques_global = df_h['Ataques'].sum()
-normales_global = total_global - ataques_global
-
-# Verdaderos positivos (TP)
-TP = int(recall * ataques_global)
-
-# Falsos negativos (FN)
-FN = ataques_global - TP
-
-# Falsos positivos (FP)
-if precision > 0:
-    FP = int((TP / precision) - TP)
-else:
-    FP = 0
-
-# Verdaderos negativos (TN)
-TN = normales_global - FP
-
-# Construir matriz
-cm_global = np.array([
-    [TN, FP],
-    [FN, TP]
-])
-
-# Graficar matriz
-fig_cm_global = px.imshow(
-    cm_global,
-    text_auto=True,
-    x=['Pred: Normal', 'Pred: Ataque'],
-    y=['Real: Normal', 'Real: Ataque'],
-    color_continuous_scale='Blues',
-    title="Matriz de Confusión Global del Modelo"
-)
-
-fig_cm_global.update_layout(
-    xaxis_title="Predicción",
-    yaxis_title="Valor Real",
-    font=dict(size=12)
-)
-
-st.plotly_chart(fig_cm_global, use_container_width=True)
-
-st.divider()
-    # Tabla detallada
+    
+    acc_global = df_h['Accuracy'].mean()
+    prec_global = df_h['Precision'].mean()
+    rec_global = df_h['Recall'].mean()
+    f1_global = df_h['F1'].mean()
+    
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    
+    with col_m1:
+        st.metric(
+            "Accuracy global",
+            f"{acc_global:.2%}"
+        )
+    
+    with col_m2:
+        st.metric(
+            "Precision global",
+            f"{prec_global:.2%}"
+        )
+    
+    with col_m3:
+        st.metric(
+            "Recall global",
+            f"{rec_global:.2%}"
+        )
+    
+    with col_m4:
+        st.metric(
+            "F1-Score global",
+            f"{f1_global:.2%}"
+        )
+    
+    st.divider()
+    
+    # ==========================================================
+    # MATRIZ GLOBAL
+    # ==========================================================
+    
+    st.subheader("📊 Matriz de confusión global del modelo")
+    
+    total_global = df_h['Total'].sum()
+    ataques_global = df_h['Ataques'].sum()
+    
+    TP = int(rec_global * ataques_global)
+    FN = ataques_global - TP
+    
+    if prec_global > 0:
+        FP = int((TP / prec_global) - TP)
+    else:
+        FP = 0
+    
+    TN = (total_global - ataques_global) - FP
+    
+    cm_global = np.array([
+        [TN, FP],
+        [FN, TP]
+    ])
+    
+    fig_cm_global = px.imshow(
+        cm_global,
+        text_auto=True,
+        x=['Pred: Normal', 'Pred: Ataque'],
+        y=['Real: Normal', 'Real: Ataque'],
+        color_continuous_scale='Blues'
+    )
+    
+    st.plotly_chart(
+        fig_cm_global,
+        use_container_width=True
+    )
+    
+    st.divider()
+    
+    # ==========================================================
+    # TABLA FINAL
+    # ==========================================================
+    
     st.subheader("📋 Registro detallado de todas las simulaciones")
-    columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
-                'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
+    
+    columnas = [
+        'Fecha',
+        'Hora',
+        'Dataset',
+        'Total',
+        'Normales',
+        'Ataques',
+        'Accuracy',
+        'Precision',
+        'Recall',
+        'F1',
+        'Puerto',
+        'Tiempo (s)'
+    ]
+    
     for col in columnas:
         if col not in df_h.columns:
             df_h[col] = np.nan
+    
     df_display = df_h.copy()
+    
     df_display['Fecha'] = df_display['Fecha'].dt.date
-    df_display['Hora'] = df_display['Hora'].astype(str).str[:8]
+    
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_display.columns:
-            df_display[col] = df_display[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-    st.dataframe(df_display[columnas], use_container_width=True, height=400)
-    # Nota: Los reportes descargables están en la Pestaña 3
+            df_display[col] = df_display[col].apply(
+                lambda x: f"{x:.2%}"
+            )
+    
+    st.dataframe(
+        df_display[columnas],
+        use_container_width=True,
+        height=400
+    )
 # =====================================================================
 # PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
 # =====================================================================
