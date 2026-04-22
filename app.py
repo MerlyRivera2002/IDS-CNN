@@ -445,17 +445,57 @@ with tab2:
     st.divider()
     
     # ==========================================================
-    # MÉTRICAS GLOBALES
+# MÉTRICAS GLOBALES
+# ==========================================================
 
-    st.subheader("📈 Visualización individual de métricas")
+    st.subheader("📊 Métricas globales del modelo")
 
-# Selector de métrica
+# Calcular métricas globales
+acc_global = df_h['Accuracy'].mean()
+prec_global = df_h['Precision'].mean()
+rec_global = df_h['Recall'].mean()
+f1_global = df_h['F1'].mean()
+
+# Mostrar métricas numéricas
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+
+with col_m1:
+    st.metric(
+        "Accuracy global",
+        f"{acc_global:.2%}"
+    )
+
+with col_m2:
+    st.metric(
+        "Precision global",
+        f"{prec_global:.2%}"
+    )
+
+with col_m3:
+    st.metric(
+        "Recall global",
+        f"{rec_global:.2%}"
+    )
+
+with col_m4:
+    st.metric(
+        "F1-Score global",
+        f"{f1_global:.2%}"
+    )
+
+st.divider()
+
+# ==========================================================
+# GRÁFICO DINÁMICO POR MÉTRICA
+# ==========================================================
+
+st.subheader("📈 Visualización individual de métricas")
+
 metrica_seleccionada = st.selectbox(
-    "Seleccionar métrica para visualizar:",
+    "Seleccionar métrica:",
     ["Accuracy", "Precision", "Recall", "F1"]
 )
 
-# Crear gráfico dinámico
 fig_individual = px.line(
     df_h,
     x='Fecha',
@@ -475,50 +515,15 @@ fig_individual.update_layout(
         tickformat="%b %Y",
         tickangle=-45
     ),
-    plot_bgcolor='white',
-    font=dict(size=13)
+    plot_bgcolor='white'
 )
 
-st.plotly_chart(fig_individual, use_container_width=True)
-    
-    # ==========================================================
-    # MATRIZ GLOBAL
-    # ==========================================================
-    
-    st.subheader("📊 Matriz de confusión global del modelo")
-    
-    total_global = df_h['Total'].sum()
-    ataques_global = df_h['Ataques'].sum()
-    
-    TP = int(rec_global * ataques_global)
-    FN = ataques_global - TP
-    
-    if prec_global > 0:
-        FP = int((TP / prec_global) - TP)
-    else:
-        FP = 0
-    
-    TN = (total_global - ataques_global) - FP
-    
-    cm_global = np.array([
-        [TN, FP],
-        [FN, TP]
-    ])
-    
-    fig_cm_global = px.imshow(
-        cm_global,
-        text_auto=True,
-        x=['Pred: Normal', 'Pred: Ataque'],
-        y=['Real: Normal', 'Real: Ataque'],
-        color_continuous_scale='Blues'
-    )
-    
-    st.plotly_chart(
-        fig_cm_global,
-        use_container_width=True
-    )
-    
-    st.divider()
+st.plotly_chart(
+    fig_individual,
+    use_container_width=True
+)
+
+st.divider()
     
     # ==========================================================
     # TABLA FINAL
