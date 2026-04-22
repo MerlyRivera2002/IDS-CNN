@@ -290,16 +290,8 @@ with tab2:
         st.warning("El archivo está vacío. Ejecuta una simulación.")
         st.stop()
     
-    # Procesar fechas y hora
+    # Procesar fechas
     df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
-    
-    if 'Hora' in df_h.columns:
-        df_h['Hora'] = df_h['Hora'].astype(str).str.split().str[-1]
-        df_h['Hora'] = df_h['Hora'].apply(
-            lambda x: x if len(x) == 8 else "00:00:00"
-        )
-    else:
-        df_h['Hora'] = "00:00:00"
     
     for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
         if col in df_h.columns:
@@ -307,7 +299,10 @@ with tab2:
     
     df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
     
+    # ==========================================================
     # KPIs
+    # ==========================================================
+    
     st.subheader("📌 Resumen global")
     
     col1, col2, col3, col4 = st.columns(4)
@@ -340,7 +335,10 @@ with tab2:
     
     st.divider()
     
-    # Evolución temporal
+    # ==========================================================
+    # EVOLUCIÓN TEMPORAL
+    # ==========================================================
+    
     st.subheader("📈 Evolución temporal de intrusiones")
     
     fig_line = px.line(
@@ -369,7 +367,7 @@ with tab2:
     st.divider()
     
     # ==========================================================
-    # TENDENCIA DE PUERTOS 
+    # TENDENCIA DE PUERTOS
     # ==========================================================
     
     st.subheader("🔍 Tendencia de puertos atacados")
@@ -401,6 +399,8 @@ with tab2:
     )
     
     st.plotly_chart(fig_puertos, use_container_width=True)
+    
+    st.divider()
     
     # ==========================================================
     # EVOLUCIÓN DE PUERTOS POR FECHA
@@ -445,83 +445,71 @@ with tab2:
     st.divider()
     
     # ==========================================================
-    # MÉTRICAS GLOBALES
+    # MÉTRICAS GLOBALES INTERACTIVAS
     # ==========================================================
     
     st.subheader("📊 Métricas globales del modelo")
 
-    # Calcular métricas globales
     acc_global = df_h['Accuracy'].mean()
     prec_global = df_h['Precision'].mean()
     rec_global = df_h['Recall'].mean()
     f1_global = df_h['F1'].mean()
 
-    # Mostrar métricas numéricas
+    if "metrica_activa" not in st.session_state:
+        st.session_state.metrica_activa = None
+
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
 
     with col_m1:
-        st.metric(
-            "Accuracy global",
-            f"{acc_global:.2%}"
-        )
+        st.metric("Accuracy", f"{acc_global:.2%}")
+        if st.button("Ver", key="btn_acc"):
+            st.session_state.metrica_activa = "Accuracy"
 
     with col_m2:
-        st.metric(
-            "Precision global",
-            f"{prec_global:.2%}"
-        )
+        st.metric("Precision", f"{prec_global:.2%}")
+        if st.button("Ver", key="btn_prec"):
+            st.session_state.metrica_activa = "Precision"
 
     with col_m3:
-        st.metric(
-            "Recall global",
-            f"{rec_global:.2%}"
-        )
+        st.metric("Recall", f"{rec_global:.2%}")
+        if st.button("Ver", key="btn_rec"):
+            st.session_state.metrica_activa = "Recall"
 
     with col_m4:
-        st.metric(
-            "F1-Score global",
-            f"{f1_global:.2%}"
+        st.metric("F1-Score", f"{f1_global:.2%}")
+        if st.button("Ver", key="btn_f1"):
+            st.session_state.metrica_activa = "F1"
+
+    if st.session_state.metrica_activa is not None:
+
+        metrica = st.session_state.metrica_activa
+
+        fig_metric = px.line(
+            df_h,
+            x='Fecha',
+            y=metrica,
+            markers=True,
+            title=f"Evolución de {metrica}"
         )
 
-    st.divider()
+        fig_metric.update_layout(
+            yaxis=dict(
+                title=metrica,
+                tickformat=".0%",
+                gridcolor='lightgray'
+            ),
+            xaxis=dict(
+                title="Fecha",
+                tickformat="%b %Y",
+                tickangle=-45
+            ),
+            plot_bgcolor='white'
+        )
 
-    # ==========================================================
-    # GRÁFICO DINÁMICO POR MÉTRICA
-    # ==========================================================
-
-    st.subheader("📈 Visualización individual de métricas")
-
-    metrica_seleccionada = st.selectbox(
-        "Seleccionar métrica:",
-        ["Accuracy", "Precision", "Recall", "F1"]
-    )
-
-    fig_individual = px.line(
-        df_h,
-        x='Fecha',
-        y=metrica_seleccionada,
-        markers=True,
-        title=f"Evolución de {metrica_seleccionada}"
-    )
-
-    fig_individual.update_layout(
-        yaxis=dict(
-            title=metrica_seleccionada,
-            tickformat=".0%",
-            gridcolor='lightgray'
-        ),
-        xaxis=dict(
-            title="Fecha",
-            tickformat="%b %Y",
-            tickangle=-45
-        ),
-        plot_bgcolor='white'
-    )
-
-    st.plotly_chart(
-        fig_individual,
-        use_container_width=True
-    )
+        st.plotly_chart(
+            fig_metric,
+            use_container_width=True
+        )
 
     st.divider()
     
