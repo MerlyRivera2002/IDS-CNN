@@ -343,15 +343,19 @@ with tab2:
     
     st.divider()
     
-    # Tendencia de puertos (Top 5)
     st.subheader("🔍 Tendencia de puertos atacados")
-    puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
-    puertos_counts.columns = ['Puerto', 'Frecuencia']
-    fig_puertos = px.bar(
-        puertos_counts, x='Puerto', y='Frecuencia',
-        title="Top 5 puertos más atacados en el historial",
-        color='Frecuencia', color_continuous_scale='Reds', text='Frecuencia'
-    )
+
+puertos_counts = df_h['Puerto'].value_counts().head(5).reset_index()
+
+fig_puertos = px.bar(
+    puertos_counts,
+    x='Puerto',
+    y='Frecuencia',
+    title="Top 5 puertos más atacados en el historial",
+    color='Frecuencia',
+    color_continuous_scale='Reds',
+    text='Frecuencia'
+)
     fig_puertos.update_traces(textposition='outside')
     fig_puertos.update_layout(
         xaxis_title="Puerto", yaxis_title="Número de veces atacado",
@@ -375,30 +379,94 @@ with tab2:
     
     st.divider()
     
-    # Evolución de la precisión (Accuracy)
-    if 'Accuracy' in df_h.columns and df_h['Accuracy'].notna().any():
-        st.subheader("🎯 Evolución de la precisión del modelo")
-        fig_acc = px.line(
-            df_h, x='Fecha', y='Accuracy', markers=True,
-            title="Precisión (Accuracy) por simulación",
-            labels={'Accuracy': 'Precisión', 'Fecha': 'Fecha'},
-            line_shape='linear'
-        )
-        fig_acc.update_traces(
-            line_color='#2c3e50', line_width=2,
-            marker=dict(size=8, symbol='circle', color='#16a085'),
-            textposition='top center', textfont_size=10
-        )
-        if len(df_h) <= 20:
-            fig_acc.update_traces(text=df_h['Accuracy'].apply(lambda x: f"{x:.2%}"), selector=dict(mode='lines+markers+text'))
-        fig_acc.update_layout(
-            yaxis=dict(title="Accuracy", gridcolor='lightgray', showgrid=True, tickformat=".0%"),
-            xaxis=dict(title="Fecha", tickformat="%b %Y", tickangle=-45),
-            plot_bgcolor='white', font=dict(size=12)
-        )
-        st.plotly_chart(fig_acc, use_container_width=True)
-        st.divider()
-    
+    # ==========================================================
+# MÉTRICAS GLOBALES DEL MODELO (GENERAL DEL HISTORIAL)
+# ==========================================================
+
+st.subheader("📊 Métricas globales del modelo")
+
+# Calcular promedios globales
+acc_global = df_h['Accuracy'].mean() if 'Accuracy' in df_h else 0
+prec_global = df_h['Precision'].mean() if 'Precision' in df_h else 0
+rec_global = df_h['Recall'].mean() if 'Recall' in df_h else 0
+f1_global = df_h['F1'].mean() if 'F1' in df_h else 0
+
+# Mostrar métricas numéricas
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+
+with col_m1:
+    st.metric("🎯 Accuracy global", f"{acc_global:.2%}")
+
+with col_m2:
+    st.metric("🎯 Precision global", f"{prec_global:.2%}")
+
+with col_m3:
+    st.metric("🎯 Recall global", f"{rec_global:.2%}")
+
+with col_m4:
+    st.metric("🎯 F1-Score global", f"{f1_global:.2%}")
+
+st.divider()
+
+# ==========================================================
+# MATRIZ DE CONFUSIÓN GLOBAL APROXIMADA
+# ==========================================================
+
+st.subheader("📊 Matriz de confusión global del modelo")
+
+# Aproximación usando promedios históricos
+# (válida cuando se almacenan métricas por simulación)
+
+# Tomar valores promedio
+accuracy = acc_global
+recall = rec_global
+precision = prec_global
+
+# Estimar valores base
+total_global = df_h['Total'].sum()
+ataques_global = df_h['Ataques'].sum()
+normales_global = total_global - ataques_global
+
+# Verdaderos positivos (TP)
+TP = int(recall * ataques_global)
+
+# Falsos negativos (FN)
+FN = ataques_global - TP
+
+# Falsos positivos (FP)
+if precision > 0:
+    FP = int((TP / precision) - TP)
+else:
+    FP = 0
+
+# Verdaderos negativos (TN)
+TN = normales_global - FP
+
+# Construir matriz
+cm_global = np.array([
+    [TN, FP],
+    [FN, TP]
+])
+
+# Graficar matriz
+fig_cm_global = px.imshow(
+    cm_global,
+    text_auto=True,
+    x=['Pred: Normal', 'Pred: Ataque'],
+    y=['Real: Normal', 'Real: Ataque'],
+    color_continuous_scale='Blues',
+    title="Matriz de Confusión Global del Modelo"
+)
+
+fig_cm_global.update_layout(
+    xaxis_title="Predicción",
+    yaxis_title="Valor Real",
+    font=dict(size=12)
+)
+
+st.plotly_chart(fig_cm_global, use_container_width=True)
+
+st.divider()
     # Tabla detallada
     st.subheader("📋 Registro detallado de todas las simulaciones")
     columnas = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
