@@ -226,17 +226,23 @@ COLOR_WARN    = "#ffaa00"
 COLOR_SUCCESS = "#00c853"
 
 def apply_theme(fig, height=320, title="", xaxis_title="", yaxis_title="",
-                xaxis_extra=None, yaxis_extra=None, **kwargs):
+                xaxis_extra=None, yaxis_extra=None, no_axes=False, **kwargs):
     base = dict(PLOTLY_LAYOUT)
-    # Merge xaxis / yaxis extras on top of base
-    x = dict(base.pop("xaxis", {}))
-    y = dict(base.pop("yaxis", {}))
-    if xaxis_extra:  x.update(xaxis_extra)
-    if yaxis_extra:  y.update(yaxis_extra)
-    if xaxis_title:  x["title"] = xaxis_title
-    if yaxis_title:  y["title"] = yaxis_title
-    fig.update_layout(**base, height=height, title=title,
-                      xaxis=x, yaxis=y, **kwargs)
+    base.pop("xaxis", None)
+    base.pop("yaxis", None)
+    layout = dict(**base, height=height, title=title, **kwargs)
+    if not no_axes:
+        x = dict(gridcolor="#142035", linecolor="#1a3a5c",
+                 tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8"))
+        y = dict(gridcolor="#142035", linecolor="#1a3a5c",
+                 tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8"))
+        if xaxis_extra:  x.update(xaxis_extra)
+        if yaxis_extra:  y.update(yaxis_extra)
+        if xaxis_title:  x["title"] = xaxis_title
+        if yaxis_title:  y["title"] = yaxis_title
+        layout["xaxis"] = x
+        layout["yaxis"] = y
+    fig.update_layout(**layout)
     return fig
 
 
@@ -380,7 +386,7 @@ with tab1:
                                         line=dict(color="#080f1a", width=3)),
                             textfont=dict(size=13, color="#e0eaf5"),
                         ))
-                        apply_theme(fig_pie, height=280,
+                        apply_theme(fig_pie, height=280, no_axes=True,
                                     title=f"Tráfico — {len(preds_totales)} registros",
                                     showlegend=True,
                                     legend=dict(orientation="h", y=-0.05,
@@ -634,7 +640,7 @@ with tab2:
         ),
         hovertemplate="<b>%{label}</b><br>Frecuencia: %{value}<extra></extra>",
     ))
-    apply_theme(fig_tree, height=380, title="Puertos más atacados (tamaño = frecuencia)")
+    apply_theme(fig_tree, height=380, no_axes=True, title="Puertos más atacados (tamaño = frecuencia)")
     st.plotly_chart(fig_tree, use_container_width=True)
 
     st.divider()
