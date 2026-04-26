@@ -225,8 +225,18 @@ COLOR_ACCENT  = "#7ec8f7"
 COLOR_WARN    = "#ffaa00"
 COLOR_SUCCESS = "#00c853"
 
-def apply_theme(fig, height=320):
-    fig.update_layout(**PLOTLY_LAYOUT, height=height)
+def apply_theme(fig, height=320, title="", xaxis_title="", yaxis_title="",
+                xaxis_extra=None, yaxis_extra=None, **kwargs):
+    base = dict(PLOTLY_LAYOUT)
+    # Merge xaxis / yaxis extras on top of base
+    x = dict(base.pop("xaxis", {}))
+    y = dict(base.pop("yaxis", {}))
+    if xaxis_extra:  x.update(xaxis_extra)
+    if yaxis_extra:  y.update(yaxis_extra)
+    if xaxis_title:  x["title"] = xaxis_title
+    if yaxis_title:  y["title"] = yaxis_title
+    fig.update_layout(**base, height=height, title=title,
+                      xaxis=x, yaxis=y, **kwargs)
     return fig
 
 
@@ -370,18 +380,16 @@ with tab1:
                                         line=dict(color="#080f1a", width=3)),
                             textfont=dict(size=13, color="#e0eaf5"),
                         ))
-                        fig_pie.update_layout(
-                            **PLOTLY_LAYOUT, height=280,
-                            title=f"Tráfico — {len(preds_totales)} registros",
-                            showlegend=True,
-                            legend=dict(orientation="h", y=-0.05,
-                                        font=dict(color="#c8d8e8", size=12)),
-                            annotations=[dict(
-                                text=f"<b>{ataques}</b><br><span style='font-size:10px'>ataques</span>",
-                                x=0.5, y=0.5, font=dict(size=16, color=COLOR_ATAQUE),
-                                showarrow=False
-                            )]
-                        )
+                        apply_theme(fig_pie, height=280,
+                                    title=f"Tráfico — {len(preds_totales)} registros",
+                                    showlegend=True,
+                                    legend=dict(orientation="h", y=-0.05,
+                                                font=dict(color="#c8d8e8", size=12)),
+                                    annotations=[dict(
+                                        text=f"<b>{ataques}</b><br><span style='font-size:10px'>ataques</span>",
+                                        x=0.5, y=0.5, font=dict(size=16, color=COLOR_ATAQUE),
+                                        showarrow=False
+                                    )])
                         esp_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{idx}")
 
                         # ── Evolución ──
@@ -393,10 +401,10 @@ with tab1:
                             fillcolor="rgba(255,79,94,.15)",
                             name="Ataques acumulados"
                         ))
-                        fig_evol.update_layout(**PLOTLY_LAYOUT, height=240,
-                                               title="Evolución de intrusiones",
-                                               xaxis_title="Registros procesados",
-                                               yaxis_title="Ataques")
+                        apply_theme(fig_evol, height=240,
+                                    title="Evolución de intrusiones",
+                                    xaxis_title="Registros procesados",
+                                    yaxis_title="Ataques")
                         esp_evolucion.plotly_chart(fig_evol, use_container_width=True, key=f"evol_{idx}")
 
                         # ── Métricas dinámicas ──
@@ -427,10 +435,10 @@ with tab1:
                                 text=puertos["Freq"], textposition="outside",
                                 textfont=dict(color="#c8d8e8", size=12),
                             ))
-                            fig_p.update_layout(**PLOTLY_LAYOUT, height=210,
-                                                title="Top 5 puertos — lote actual",
-                                                xaxis_title="Puerto destino",
-                                                yaxis_title="Paquetes")
+                            apply_theme(fig_p, height=210,
+                                        title="Top 5 puertos — lote actual",
+                                        xaxis_title="Puerto destino",
+                                        yaxis_title="Paquetes")
                             st.plotly_chart(fig_p, use_container_width=True, key=f"puertos_{idx}")
 
                         # ── Tabla ──
@@ -499,14 +507,11 @@ with tab1:
                                 textfont=dict(size=14, color="#e0eaf5"),
                                 width=0.5,
                             ))
-                        fig_met.update_layout(
-                            **PLOTLY_LAYOUT, height=360,
-                            title="Métricas de clasificación binaria",
-                            showlegend=False,
-                            yaxis=dict(range=[0, 105], gridcolor="#142035",
-                                       ticksuffix="%", tickfont=dict(color="#7ea8c8")),
-                            bargap=0.35,
-                        )
+                        apply_theme(fig_met, height=360,
+                                    title="Métricas de clasificación binaria",
+                                    showlegend=False,
+                                    yaxis_extra=dict(range=[0, 105], ticksuffix="%"),
+                                    bargap=0.35)
                         st.plotly_chart(fig_met, use_container_width=True)
 
                         # Matriz de confusión
@@ -522,12 +527,12 @@ with tab1:
                             showscale=True,
                             colorbar=dict(tickfont=dict(color="#c8d8e8")),
                         ))
-                        fig_cm.update_layout(**PLOTLY_LAYOUT, height=340,
-                                             title="Matriz de Confusión — Normal vs Ataque",
-                                             xaxis=dict(title="Predicción", side="bottom",
-                                                        tickfont=dict(size=13, color="#7ea8c8")),
-                                             yaxis=dict(title="Valor Real",
-                                                        tickfont=dict(size=13, color="#7ea8c8")))
+                        apply_theme(fig_cm, height=340,
+                                    title="Matriz de Confusión — Normal vs Ataque",
+                                    xaxis_extra=dict(title="Predicción", side="bottom",
+                                                     tickfont=dict(size=13, color="#7ea8c8")),
+                                    yaxis_extra=dict(title="Valor Real",
+                                                     tickfont=dict(size=13, color="#7ea8c8")))
                         st.plotly_chart(fig_cm, use_container_width=True)
 
                         p_top = df_clean.iloc[:len(preds_totales)]["Destination Port"].mode()[0]
@@ -600,11 +605,10 @@ with tab2:
         fill="tozeroy", fillcolor="rgba(255,79,94,.12)",
         name="Ataques"
     ))
-    fig_line.update_layout(**PLOTLY_LAYOUT, height=320,
-                           title="Ataques detectados a lo largo del tiempo",
-                           xaxis_title="Fecha", yaxis_title="Cantidad de ataques",
-                           xaxis=dict(tickformat="%d %b %Y", tickangle=-30,
-                                      gridcolor="#142035", tickfont=dict(color="#7ea8c8")))
+    apply_theme(fig_line, height=320,
+                title="Ataques detectados a lo largo del tiempo",
+                xaxis_title="Fecha", yaxis_title="Cantidad de ataques",
+                xaxis_extra=dict(tickformat="%d %b %Y", tickangle=-30))
     st.plotly_chart(fig_line, use_container_width=True)
 
     st.divider()
@@ -630,8 +634,7 @@ with tab2:
         ),
         hovertemplate="<b>%{label}</b><br>Frecuencia: %{value}<extra></extra>",
     ))
-    fig_tree.update_layout(**PLOTLY_LAYOUT, height=380,
-                           title="Puertos más atacados (tamaño = frecuencia)")
+    apply_theme(fig_tree, height=380, title="Puertos más atacados (tamaño = frecuencia)")
     st.plotly_chart(fig_tree, use_container_width=True)
 
     st.divider()
@@ -675,14 +678,10 @@ with tab2:
             fill="tozeroy",
             fillcolor=f"rgba({','.join(str(int(colors_map[met].lstrip('#')[i:i+2],16)) for i in (0,2,4))},.12)",
         ))
-        fig_ev.update_layout(
-            **PLOTLY_LAYOUT, height=300,
-            title=f"Evolución de {met}",
-            yaxis=dict(tickformat=".0%", gridcolor="#142035",
-                       tickfont=dict(color="#7ea8c8")),
-            xaxis=dict(tickformat="%d %b %Y", tickangle=-30,
-                       gridcolor="#142035", tickfont=dict(color="#7ea8c8")),
-        )
+        apply_theme(fig_ev, height=300,
+                    title=f"Evolución de {met}",
+                    yaxis_extra=dict(tickformat=".0%"),
+                    xaxis_extra=dict(tickformat="%d %b %Y", tickangle=-30))
         st.plotly_chart(fig_ev, use_container_width=True)
 
     st.divider()
@@ -718,12 +717,10 @@ with tab2:
         showscale=True,
         colorbar=dict(tickfont=dict(color="#c8d8e8")),
     ))
-    fig_cm_hist.update_layout(
-        **PLOTLY_LAYOUT, height=360,
-        title="Matriz de Confusión acumulada — Normal vs Ataque",
-        xaxis=dict(title="Predicción", tickfont=dict(size=13, color="#7ea8c8")),
-        yaxis=dict(title="Valor Real", tickfont=dict(size=13, color="#7ea8c8")),
-    )
+    apply_theme(fig_cm_hist, height=360,
+                title="Matriz de Confusión acumulada — Normal vs Ataque",
+                xaxis_extra=dict(title="Predicción", tickfont=dict(size=13, color="#7ea8c8")),
+                yaxis_extra=dict(title="Valor Real", tickfont=dict(size=13, color="#7ea8c8")))
     st.plotly_chart(fig_cm_hist, use_container_width=True)
 
     # Métricas derivadas de la CM
