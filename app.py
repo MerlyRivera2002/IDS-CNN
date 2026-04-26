@@ -1,23 +1,242 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-import joblib
 import os
-import time
 import io
+import time
+import joblib
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
+import streamlit as st
+from sklearn.metrics import (
+    precision_score, recall_score, f1_score,
+    accuracy_score, confusion_matrix
+)
 import logic
 
-st.set_page_config(page_title="IDS Tesis 2026", layout="wide", page_icon="🛡️")
+# ═══════════════════════════════════════════════════════════════
+# CONFIGURACIÓN GLOBAL
+# ═══════════════════════════════════════════════════════════════
+st.set_page_config(
+    page_title="IDS · CNN Tesis 2026",
+    layout="wide",
+    page_icon="🛡️",
+    initial_sidebar_state="expanded"
+)
 
-# --- LOGIN (igual) ---
-if 'perfil' not in st.session_state:
+# ═══════════════════════════════════════════════════════════════
+# TEMA VISUAL — INYECCIÓN CSS
+# ═══════════════════════════════════════════════════════════════
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+/* ── Fondo general ── */
+html, body, [data-testid="stApp"] {
+    background: #080f1a !important;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #0d1929 !important;
+    border-right: 1px solid #1a3a5c;
+}
+[data-testid="stSidebar"] * { color: #c8d8e8 !important; }
+[data-testid="stSidebar"] input {
+    background: #0a1622 !important;
+    border: 1px solid #1e4a7a !important;
+    color: #e0eaf5 !important;
+    border-radius: 6px;
+}
+[data-testid="stSidebar"] .stButton > button {
+    background: #0a2540 !important;
+    border: 1px solid #1e6fbf !important;
+    color: #7ec8f7 !important;
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    width: 100%;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: #0f3560 !important;
+    border-color: #00c8ff !important;
+}
+
+/* ── Tabs ── */
+[data-testid="stTabs"] [role="tablist"] {
+    background: #0d1929;
+    border-radius: 10px 10px 0 0;
+    padding: 6px 8px 0;
+    border-bottom: 1px solid #1a3a5c;
+    gap: 4px;
+}
+[data-testid="stTabs"] button[role="tab"] {
+    color: #6a8eaa !important;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    border-radius: 7px 7px 0 0;
+    padding: 8px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+}
+[data-testid="stTabs"] button[role="tab"]:hover {
+    color: #7ec8f7 !important;
+    background: #0a1f38;
+}
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+    color: #00c8ff !important;
+    background: #0a1f38;
+    border-bottom: 2px solid #00c8ff;
+}
+[data-testid="stTabsContent"] {
+    background: #0d1929;
+    border-radius: 0 0 10px 10px;
+    padding: 1.5rem;
+    border: 1px solid #1a3a5c;
+    border-top: none;
+}
+
+/* ── Métricas ── */
+[data-testid="stMetric"] {
+    background: #0a1f38;
+    border: 1px solid #1a4a7a;
+    border-radius: 10px;
+    padding: 14px 18px;
+}
+[data-testid="stMetricLabel"] { color: #7ea8c8 !important; font-size: 12px !important; font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: .06em; }
+[data-testid="stMetricValue"] { color: #00c8ff !important; font-size: 26px !important; font-weight: 600 !important; }
+[data-testid="stMetricDelta"] svg { display: none; }
+[data-testid="stMetricDelta"] { color: #ff5555 !important; font-size: 13px !important; }
+
+/* ── Headers ── */
+h1, h2, h3 { font-family: 'Space Mono', monospace !important; color: #e0eaf5 !important; }
+h1 { font-size: 22px !important; letter-spacing: .04em; }
+h2 { font-size: 17px !important; color: #7ec8f7 !important; }
+h3 { font-size: 14px !important; color: #6a9ec0 !important; }
+
+/* ── Texto general ── */
+p, span, label, div { color: #c8d8e8; }
+
+/* ── Dataframe / tablas ── */
+[data-testid="stDataFrame"], iframe {
+    border: 1px solid #1a3a5c !important;
+    border-radius: 8px !important;
+    background: #080f1a !important;
+}
+.stDataFrame td, .stDataFrame th {
+    font-size: 13px !important;
+    color: #c8d8e8 !important;
+    background: #0a1622 !important;
+}
+
+/* ── File uploader ── */
+[data-testid="stFileUploader"] {
+    border: 1.5px dashed #1e4a7a !important;
+    border-radius: 10px;
+    background: #080f1a !important;
+    padding: 12px;
+}
+
+/* ── Slider ── */
+[data-testid="stSlider"] .stSlider > div { background: #00c8ff; }
+
+/* ── Botones principales ── */
+.stButton > button {
+    background: linear-gradient(135deg, #0a4080, #0d5fa0) !important;
+    color: #e0eaf5 !important;
+    border: 1px solid #1e6fbf !important;
+    border-radius: 8px !important;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .04em;
+    transition: all .2s;
+}
+.stButton > button:hover {
+    background: linear-gradient(135deg, #0d5fa0, #0a7acf) !important;
+    border-color: #00c8ff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,200,255,.2);
+}
+[data-testid="stButton-primary"] > button {
+    background: linear-gradient(135deg, #00829a, #00c8ff) !important;
+    color: #060e18 !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+}
+
+/* ── Progress bar ── */
+[data-testid="stProgress"] > div > div {
+    background: linear-gradient(90deg, #0060a0, #00c8ff) !important;
+}
+
+/* ── Alerts ── */
+[data-testid="stSuccess"] { background: #0a2818 !important; border-left: 3px solid #00c853 !important; color: #8affa0 !important; }
+[data-testid="stWarning"] { background: #1e1500 !important; border-left: 3px solid #ffaa00 !important; color: #ffd060 !important; }
+[data-testid="stError"]   { background: #1e0808 !important; border-left: 3px solid #ff3333 !important; color: #ff8080 !important; }
+[data-testid="stInfo"]    { background: #081828 !important; border-left: 3px solid #0080c0 !important; color: #7ec8f7 !important; }
+
+/* ── Divider ── */
+hr { border-color: #1a3a5c !important; }
+
+/* ── Date input ── */
+[data-testid="stDateInput"] input {
+    background: #0a1622 !important;
+    border: 1px solid #1e4a7a !important;
+    color: #e0eaf5 !important;
+    border-radius: 6px;
+}
+
+/* ── Select box ── */
+[data-testid="stSelectbox"] > div {
+    background: #0a1622 !important;
+    border: 1px solid #1e4a7a !important;
+    border-radius: 6px;
+}
+
+/* Download button */
+[data-testid="stDownloadButton"] > button {
+    background: #0a1f38 !important;
+    border: 1px solid #1e6fbf !important;
+    color: #7ec8f7 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════
+# PALETA PLOTLY — TEMA OSCURO COHERENTE
+# ═══════════════════════════════════════════════════════════════
+PLOTLY_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="#080f1a",
+    font=dict(family="DM Sans", color="#c8d8e8", size=13),
+    margin=dict(t=40, b=30, l=10, r=10),
+    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#c8d8e8")),
+    xaxis=dict(gridcolor="#142035", linecolor="#1a3a5c", tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8")),
+    yaxis=dict(gridcolor="#142035", linecolor="#1a3a5c", tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8")),
+    title_font=dict(family="Space Mono", color="#e0eaf5", size=14),
+)
+COLOR_ATAQUE  = "#ff4f5e"
+COLOR_NORMAL  = "#00c8ff"
+COLOR_ACCENT  = "#7ec8f7"
+COLOR_WARN    = "#ffaa00"
+COLOR_SUCCESS = "#00c853"
+
+def apply_theme(fig, height=320):
+    fig.update_layout(**PLOTLY_LAYOUT, height=height)
+    return fig
+
+
+# ═══════════════════════════════════════════════════════════════
+# LOGIN
+# ═══════════════════════════════════════════════════════════════
+if "perfil" not in st.session_state:
     st.session_state.perfil = None
 
-st.sidebar.title("🔐 Control de Acceso")
+st.sidebar.markdown("### 🔐 Control de Acceso")
 if st.session_state.perfil is None:
     u = st.sidebar.text_input("Usuario")
     p = st.sidebar.text_input("Clave", type="password")
@@ -32,619 +251,609 @@ if st.session_state.perfil is None:
             st.sidebar.error("Credenciales incorrectas")
     st.stop()
 else:
-    st.sidebar.success(f"Conectado como: {st.session_state.perfil}")
+    st.sidebar.success(f"✔ {st.session_state.perfil}")
     st.sidebar.divider()
-    st.sidebar.subheader("📅 Simulación de Tiempo")
-    fecha_simulada = st.sidebar.date_input("Fecha del Escaneo", value=pd.to_datetime("2026-04-01"))
+    st.sidebar.markdown("**📅 Fecha de simulación**")
+    fecha_simulada = st.sidebar.date_input("", value=pd.to_datetime("2026-04-01"), label_visibility="collapsed")
+    st.sidebar.divider()
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.clear()
         st.rerun()
 
-# Carga de activos
+# ═══════════════════════════════════════════════════════════════
+# CARGA DE MODELO
+# ═══════════════════════════════════════════════════════════════
 @st.cache_resource
 def load_assets():
-    return (tf.keras.models.load_model("modelo_cnn.keras"),
-            joblib.load("scaler.pkl"),
-            joblib.load("features.pkl"))
+    return (
+        tf.keras.models.load_model("modelo_cnn.keras"),
+        joblib.load("scaler.pkl"),
+        joblib.load("features.pkl"),
+    )
 
 model, scaler, features_list = load_assets()
 
-# Crear las 3 pestañas
-tab1, tab2, tab3 = st.tabs(["🚀 SIMULACIÓN EN VIVO", "📈 ANÁLISIS Y TENDENCIAS", "📋 MOVIMIENTOS Y REPORTES"])
-#-------------------------------------------pestaña 1-------------------------------------------
+# ═══════════════════════════════════════════════════════════════
+# HEADER
+# ═══════════════════════════════════════════════════════════════
+st.markdown("""
+<div style="background:linear-gradient(135deg,#0a1f38,#0d2d52);border:1px solid #1a4a7a;border-radius:12px;padding:18px 24px;margin-bottom:1.4rem;display:flex;align-items:center;gap:16px;">
+  <div style="font-size:36px;">🛡️</div>
+  <div>
+    <div style="font-family:'Space Mono',monospace;font-size:20px;color:#e0eaf5;font-weight:700;letter-spacing:.05em;">SISTEMA DE DETECCIÓN DE INTRUSIONES</div>
+    <div style="font-family:'DM Sans',sans-serif;color:#7ea8c8;font-size:13px;margin-top:3px;">Red Neuronal Convolucional 1D · Clasificación Binaria · CICIDS2017</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
+# ═══════════════════════════════════════════════════════════════
+# TABS
+# ═══════════════════════════════════════════════════════════════
+tab1, tab2, tab3 = st.tabs([
+    "🚀  SIMULACIÓN EN VIVO",
+    "📈  ANÁLISIS Y TENDENCIAS",
+    "📋  MOVIMIENTOS Y REPORTES",
+])
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                     PESTAÑA 1                               ║
+# ╚══════════════════════════════════════════════════════════════╝
 with tab1:
     if st.session_state.perfil == "Administrador":
-        st.header("🛡️ Monitor de Tráfico en Tiempo Real")
-        
-        # Controles
-        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([2, 1, 1])
+        st.header("Monitor de Tráfico en Tiempo Real")
+
+        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([3, 1.5, 1])
         with col_ctrl1:
             archivo = st.file_uploader("Subir dataset CSV", type=["csv"], key="uploader_sim")
         with col_ctrl2:
-            velocidad = st.slider("Velocidad (segundos/lote)", min_value=0.02, max_value=0.5, value=0.08, step=0.02)
+            velocidad = st.slider("Seg / lote", 0.02, 0.5, 0.08, 0.02)
         with col_ctrl3:
-            if st.button("🔄 Limpiar resultados", use_container_width=True):
-                if 'simulacion_activa' in st.session_state:
-                    del st.session_state.simulacion_activa
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 Limpiar", use_container_width=True):
+                st.session_state.pop("simulacion_activa", None)
                 st.rerun()
-        
-        # Contenedores dinámicos
-        col_izq, col_der = st.columns([1, 1])
+
+        col_izq, col_der = st.columns(2)
         with col_izq:
-            espacio_pastel = st.empty()
-            espacio_evolucion = st.empty()
+            esp_pastel   = st.empty()
+            esp_evolucion = st.empty()
         with col_der:
-            espacio_metricas = st.empty()
-            espacio_puertos = st.empty()
-        
+            esp_metricas = st.empty()
+            esp_puertos  = st.empty()
+
         st.divider()
-        st.subheader("🛰️ Registro de Actividad (último lote)")
-        espacio_tabla = st.empty()
-        
-        # Estado inicial
-        if 'simulacion_activa' not in st.session_state:
+        st.subheader("Registro de actividad — último lote")
+        esp_tabla = st.empty()
+
+        if "simulacion_activa" not in st.session_state:
             st.session_state.simulacion_activa = False
-            espacio_pastel.info("👈 Esperando inicio de simulación")
-            espacio_evolucion.info("📈 Gráfico de evolución")
-            espacio_metricas.info("📊 Métricas en tiempo real")
-            espacio_puertos.info("🔍 Top puertos atacados")
-            espacio_tabla.info("📋 Los registros aparecerán aquí")
-        
+            for e in [esp_pastel, esp_evolucion, esp_metricas, esp_puertos, esp_tabla]:
+                e.info("Esperando inicio de simulación…")
+
         if archivo:
             if st.button("🚀 INICIAR MONITOREO", type="primary", use_container_width=True):
-                with st.spinner("Preparando datos..."):
-                    df_raw = pd.read_csv(archivo)
+                with st.spinner("Preparando datos…"):
+                    df_raw   = pd.read_csv(archivo)
                     df_raw.columns = df_raw.columns.str.strip()
                     df_clean = df_raw.replace([np.inf, -np.inf], np.nan).dropna()
-                    total_registros = len(df_clean)
-                    
+                    total    = len(df_clean)
+
                     preds_totales = []
-                    tiempos = []
-                    ataques_acumulados = []
-                    t_inicio = time.time()
-                    
-                    progress_bar = st.progress(0, text="Simulación en curso...")
-                    
-                    for idx, inicio in enumerate(range(0, total_registros, 15)):
-                        chunk = df_clean.iloc[inicio: inicio+15]
-                        X_chunk = scaler.transform(chunk[features_list]).reshape(-1, len(features_list), 1)
-                        chunk_preds = (model.predict(X_chunk, verbose=0) > 0.35).astype(int).flatten()   #-----pred cambio ----
+                    tiempos, ataques_acum = [], []
+                    t0 = time.time()
+                    pbar = st.progress(0, text="Simulación en curso…")
+
+                    for idx, inicio in enumerate(range(0, total, 15)):
+                        chunk = df_clean.iloc[inicio:inicio+15]
+                        X_chunk = scaler.transform(
+                            chunk[features_list]
+                        ).reshape(-1, len(features_list), 1)
+                        chunk_preds = (
+                            model.predict(X_chunk, verbose=0) > 0.35
+                        ).astype(int).flatten()
                         preds_totales.extend(chunk_preds)
-                        
-                        ataques = sum(preds_totales)
+
+                        ataques = int(sum(preds_totales))
                         normales = len(preds_totales) - ataques
-                        ataques_acumulados.append(ataques)
+                        ataques_acum.append(ataques)
                         tiempos.append(len(preds_totales))
-                        
-                        progress = (inicio + len(chunk)) / total_registros
-                        progress_bar.progress(min(progress, 1.0), text=f"Procesando {int(progress*100)}%")
-                        
-                        # Gráfico de pastel
-                        fig_pie = px.pie(values=[normales, ataques], names=['Seguro', 'Amenaza'],
-                                         color_discrete_sequence=['#2ecc71', '#e74c3c'], hole=0.6,
-                                         title=f"Tráfico actual (Total: {len(preds_totales)})")
-                        fig_pie.update_layout(height=280)
-                        espacio_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{idx}")
-                        
-                        # Evolución de ataques
-                        df_evol = pd.DataFrame({'Registros': tiempos, 'Ataques': ataques_acumulados})
-                        fig_evol = px.line(df_evol, x='Registros', y='Ataques', title='Evolución de intrusiones',
-                                           labels={'Ataques': 'Ataques detectados'})
-                        fig_evol.update_traces(line_color='#e74c3c', fill='tozeroy')
-                        espacio_evolucion.plotly_chart(fig_evol, use_container_width=True, key=f"evol_{idx}")
-                        
-                        # Métricas dinámicas
-                        with espacio_metricas.container():
-                            st.metric("📊 Conexiones totales", f"{len(preds_totales)}")
-                            st.metric("🚨 Intrusiones detectadas", f"{ataques}", delta=f"+{chunk_preds.sum()}", delta_color="inverse")
-                            elapsed = time.time() - t_inicio
-                            if elapsed > 0:
-                                st.metric("⚡ Registros/seg", f"{len(preds_totales)/elapsed:.1f}")
-                            # Si hay etiqueta, mostrar precisión acumulada
-                            col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+
+                        prog = (inicio + len(chunk)) / total
+                        pbar.progress(min(prog, 1.0), text=f"Procesando {int(prog*100)}%")
+
+                        # ── Pastel ──
+                        fig_pie = go.Figure(go.Pie(
+                            values=[normales, ataques],
+                            labels=["Normal", "Ataque"],
+                            hole=0.62,
+                            marker=dict(colors=[COLOR_NORMAL, COLOR_ATAQUE],
+                                        line=dict(color="#080f1a", width=3)),
+                            textfont=dict(size=13, color="#e0eaf5"),
+                        ))
+                        fig_pie.update_layout(
+                            **PLOTLY_LAYOUT, height=280,
+                            title=f"Tráfico — {len(preds_totales)} registros",
+                            showlegend=True,
+                            legend=dict(orientation="h", y=-0.05,
+                                        font=dict(color="#c8d8e8", size=12)),
+                            annotations=[dict(
+                                text=f"<b>{ataques}</b><br><span style='font-size:10px'>ataques</span>",
+                                x=0.5, y=0.5, font=dict(size=16, color=COLOR_ATAQUE),
+                                showarrow=False
+                            )]
+                        )
+                        esp_pastel.plotly_chart(fig_pie, use_container_width=True, key=f"pie_{idx}")
+
+                        # ── Evolución ──
+                        fig_evol = go.Figure()
+                        fig_evol.add_trace(go.Scatter(
+                            x=tiempos, y=ataques_acum, mode="lines",
+                            fill="tozeroy",
+                            line=dict(color=COLOR_ATAQUE, width=3),
+                            fillcolor="rgba(255,79,94,.15)",
+                            name="Ataques acumulados"
+                        ))
+                        fig_evol.update_layout(**PLOTLY_LAYOUT, height=240,
+                                               title="Evolución de intrusiones",
+                                               xaxis_title="Registros procesados",
+                                               yaxis_title="Ataques")
+                        esp_evolucion.plotly_chart(fig_evol, use_container_width=True, key=f"evol_{idx}")
+
+                        # ── Métricas dinámicas ──
+                        with esp_metricas.container():
+                            m1, m2 = st.columns(2)
+                            m1.metric("Conexiones", f"{len(preds_totales):,}")
+                            m2.metric("Intrusiones", f"{ataques:,}", delta=f"+{int(chunk_preds.sum())}")
+                            elapsed = time.time() - t0
+                            m3, m4 = st.columns(2)
+                            m3.metric("Reg/seg", f"{len(preds_totales)/max(elapsed,0.01):.1f}")
+                            col_label = next((c for c in df_clean.columns if c.lower() == "label"), None)
                             if col_label:
-                                y_true_parcial = df_clean[col_label].iloc[:len(preds_totales)].astype(str).str.upper().apply(
+                                y_true_p = df_clean[col_label].iloc[:len(preds_totales)].astype(str).str.upper().apply(
                                     lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)
-                                acc_parcial = accuracy_score(y_true_parcial, preds_totales) if len(preds_totales) > 0 else 0
-                                st.metric("🎯 Precisión acumulada", f"{acc_parcial:.2%}")
-                        
-                        # Top puertos
-                        with espacio_puertos.container():
-                            st.write("**🔍 Top 5 puertos objetivo (último lote)**")
-                            puertos_chunk = chunk['Destination Port'].value_counts().head(5).reset_index()
-                            puertos_chunk.columns = ['Puerto', 'Frecuencia']
-                            fig_puertos = px.bar(puertos_chunk, x='Puerto', y='Frecuencia', color='Frecuencia',
-                                                 color_continuous_scale='Reds')
-                            fig_puertos.update_layout(height=200)
-                            st.plotly_chart(fig_puertos, use_container_width=True, key=f"puertos_{idx}")
-                        
-                        # Tabla de diagnóstico
-                        with espacio_tabla.container():
-                            vista = chunk.copy()
-                            vista['Estado'] = ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds]
-                            def sugerir_amenaza(row):
-                                if row['Estado'] == "✅ NORMAL":
+                                acc_p = accuracy_score(y_true_p, preds_totales)
+                                m4.metric("Accuracy parcial", f"{acc_p:.2%}")
+
+                        # ── Puertos ──
+                        with esp_puertos.container():
+                            puertos = chunk["Destination Port"].value_counts().head(5).reset_index()
+                            puertos.columns = ["Puerto", "Freq"]
+                            fig_p = go.Figure(go.Bar(
+                                x=puertos["Puerto"].astype(str),
+                                y=puertos["Freq"],
+                                marker=dict(color=puertos["Freq"],
+                                            colorscale=[[0,"#0a3060"],[1,COLOR_ATAQUE]],
+                                            line=dict(width=0)),
+                                text=puertos["Freq"], textposition="outside",
+                                textfont=dict(color="#c8d8e8", size=12),
+                            ))
+                            fig_p.update_layout(**PLOTLY_LAYOUT, height=210,
+                                                title="Top 5 puertos — lote actual",
+                                                xaxis_title="Puerto destino",
+                                                yaxis_title="Paquetes")
+                            st.plotly_chart(fig_p, use_container_width=True, key=f"puertos_{idx}")
+
+                        # ── Tabla ──
+                        with esp_tabla.container():
+                            vista = chunk[["Destination Port"] + [c for c in chunk.columns if c != "Destination Port"][:4]].copy()
+                            vista.insert(0, "Estado", ["🚨 ATAQUE" if p == 1 else "✅ NORMAL" for p in chunk_preds])
+                            def diagnose(row):
+                                if "NORMAL" in row["Estado"]:
                                     return "Tráfico seguro"
-                                p = row['Destination Port']
-                                if p in [80,443]: return "Ataque web (HTTP/S)"
+                                p = row["Destination Port"]
+                                if p in [80, 443]: return "Ataque web HTTP/S"
                                 if p == 22: return "Fuerza bruta SSH"
                                 if p == 21: return "Acceso FTP no autorizado"
                                 return "Escaneo / puerto sospechoso"
-                            vista['Diagnóstico'] = vista.apply(sugerir_amenaza, axis=1)
-                            st.table(vista[['Destination Port', 'Estado', 'Diagnóstico']])
-                        
+                            vista["Diagnóstico"] = vista.apply(diagnose, axis=1)
+                            # Tabla con scroll completo
+                            st.dataframe(
+                                vista,
+                                use_container_width=True,
+                                height=400,
+                                hide_index=True,
+                            )
+
                         time.sleep(velocidad)
-                    
-                    progress_bar.empty()
+
+                    pbar.empty()
                     st.success("✅ Simulación finalizada.")
                     st.balloons()
-                    
-                    # Resumen ejecutivo
-                    st.subheader("📊 Resumen ejecutivo")
-                    elapsed_total = time.time() - t_inicio
-                    col_r1, col_r2, col_r3, col_r4 = st.columns(4)
-                    with col_r1: st.metric("Total registros", f"{len(preds_totales)}")
-                    with col_r2: st.metric("Ataques detectados", f"{ataques}", delta=f"{ataques/len(preds_totales):.1%}")
-                    with col_r3: st.metric("Tiempo simulación", f"{elapsed_total:.2f} s")
-                    with col_r4: st.metric("Eficiencia", f"{len(preds_totales)/elapsed_total:.1f} reg/s")
-                    
-                    # Evaluación final con etiquetas y guardado
-                    col_label = next((c for c in df_clean.columns if c.lower() == 'label'), None)
+
+                    # ── Resumen ──
+                    st.subheader("Resumen ejecutivo")
+                    elapsed_total = time.time() - t0
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Total registros",    f"{len(preds_totales):,}")
+                    c2.metric("Ataques detectados", f"{ataques:,}",
+                              delta=f"{ataques/len(preds_totales):.1%}")
+                    c3.metric("Tiempo simulación",  f"{elapsed_total:.2f} s")
+                    c4.metric("Eficiencia",         f"{len(preds_totales)/elapsed_total:.1f} reg/s")
+
+                    col_label = next((c for c in df_clean.columns if c.lower() == "label"), None)
                     if col_label:
                         y_true = df_clean[col_label].astype(str).str.upper().apply(
-                            lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1)[:len(preds_totales)]
-                        acc = accuracy_score(y_true, preds_totales)
+                            lambda x: 0 if "BENIGN" in x or "NORMAL" in x else 1
+                        )[:len(preds_totales)]
+                        acc  = accuracy_score(y_true,  preds_totales)
                         prec = precision_score(y_true, preds_totales, zero_division=0)
-                        rec = recall_score(y_true, preds_totales, zero_division=0)
-                        f1 = f1_score(y_true, preds_totales, zero_division=0)
-                        
-                        # --- GRÁFICO DE LÍNEAS MÚLTIPLES ---
-                        st.write("**📊 Evaluación de parámetros del modelo CNN**")
-                        df_line = pd.DataFrame({
-                            'Parámetro': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
-                            'Valor (%)': [acc*100, prec*100, rec*100, f1*100]
+                        rec  = recall_score(y_true,    preds_totales, zero_division=0)
+                        f1   = f1_score(y_true,        preds_totales, zero_division=0)
+
+                        # Gráfico métricas
+                        st.subheader("Evaluación del modelo CNN")
+                        df_met = pd.DataFrame({
+                            "Métrica": ["Accuracy", "Precision", "Recall", "F1-Score"],
+                            "Valor":   [acc*100, prec*100, rec*100, f1*100],
                         })
-                        fig_line = px.line(
-                            df_line, x='Parámetro', y='Valor (%)', markers=True,
-                            text=df_line['Valor (%)'].apply(lambda x: f"{x:.2f}%"),
-                            title="Rendimiento del modelo (clasificación binaria)",
-                            line_shape='linear'
+                        fig_met = go.Figure()
+                        colors_met = [COLOR_NORMAL, COLOR_SUCCESS, COLOR_WARN, COLOR_ATAQUE]
+                        for i, row in df_met.iterrows():
+                            fig_met.add_trace(go.Bar(
+                                name=row["Métrica"],
+                                x=[row["Métrica"]],
+                                y=[row["Valor"]],
+                                marker_color=colors_met[i],
+                                text=[f"{row['Valor']:.2f}%"],
+                                textposition="outside",
+                                textfont=dict(size=14, color="#e0eaf5"),
+                                width=0.5,
+                            ))
+                        fig_met.update_layout(
+                            **PLOTLY_LAYOUT, height=360,
+                            title="Métricas de clasificación binaria",
+                            showlegend=False,
+                            yaxis=dict(range=[0, 105], gridcolor="#142035",
+                                       ticksuffix="%", tickfont=dict(color="#7ea8c8")),
+                            bargap=0.35,
                         )
-                        fig_line.update_traces(
-                            line_color='#e74c3c', line_width=2.5,
-                            marker=dict(size=12, symbol='circle', color='#2980b9', line=dict(width=1, color='white')),
-                            textposition='top center', textfont_size=12
-                        )
-                        fig_line.update_layout(
-                            yaxis=dict(title="Porcentaje (%)", range=[0, 100], gridcolor='lightgray', showgrid=True),
-                            xaxis_title="", plot_bgcolor='white', font=dict(size=13), margin=dict(t=50, b=30)
-                        )
-                        st.plotly_chart(fig_line, use_container_width=True)
-                        
-                        # --- MATRIZ DE CONFUSIÓN ---
-                        st.write("**📊 Matriz de Confusión del modelo**")
+                        st.plotly_chart(fig_met, use_container_width=True)
+
+                        # Matriz de confusión
+                        st.subheader("Matriz de Confusión")
                         cm = confusion_matrix(y_true, preds_totales)
-                        # Crear matriz con plotly
-                        fig_cm = px.imshow(
-                            cm,
-                            text_auto=True,
-                            x=['Pred: Normal', 'Pred: Ataque'],
-                            y=['Real: Normal', 'Real: Ataque'],
-                            color_continuous_scale='Blues',
-                            title="Matriz de Confusión (Normal vs Ataque)"
-                        )
-                        fig_cm.update_layout(
-                            xaxis_title="Predicción",
-                            yaxis_title="Valor Real",
-                            font=dict(size=12)
-                        )
+                        fig_cm = go.Figure(go.Heatmap(
+                            z=cm,
+                            x=["Pred: Normal", "Pred: Ataque"],
+                            y=["Real: Normal", "Real: Ataque"],
+                            colorscale=[[0, "#0a1f38"], [0.5, "#0060a0"], [1, COLOR_ATAQUE]],
+                            text=cm, texttemplate="<b>%{text}</b>",
+                            textfont=dict(size=22, color="#ffffff"),
+                            showscale=True,
+                            colorbar=dict(tickfont=dict(color="#c8d8e8")),
+                        ))
+                        fig_cm.update_layout(**PLOTLY_LAYOUT, height=340,
+                                             title="Matriz de Confusión — Normal vs Ataque",
+                                             xaxis=dict(title="Predicción", side="bottom",
+                                                        tickfont=dict(size=13, color="#7ea8c8")),
+                                             yaxis=dict(title="Valor Real",
+                                                        tickfont=dict(size=13, color="#7ea8c8")))
                         st.plotly_chart(fig_cm, use_container_width=True)
-                        # -------------------------------------------------
-                        
-                        p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
+
+                        p_top = df_clean.iloc[:len(preds_totales)]["Destination Port"].mode()[0]
                         logic.guardar_en_historial(
                             "historial.csv", archivo.name, len(preds_totales), ataques,
                             elapsed_total, fecha_simulada, p_top, acc,
-                            precision=prec, recall=rec, f1=f1
+                            precision=prec, recall=rec, f1=f1,
                         )
                     else:
-                        p_top = df_clean.iloc[:len(preds_totales)]['Destination Port'].mode()[0]
+                        p_top = df_clean.iloc[:len(preds_totales)]["Destination Port"].mode()[0]
                         logic.guardar_en_historial(
                             "historial.csv", archivo.name, len(preds_totales), ataques,
-                            elapsed_total, fecha_simulada, p_top, 0.0
+                            elapsed_total, fecha_simulada, p_top, 0.0,
                         )
-                    st.toast("Simulación registrada en Bitácora")
-        else:
-            pass
+                    st.toast("Simulación guardada en bitácora ✔")
     else:
-        st.warning("🔒 Solo Administradores.")
+        st.warning("🔒 Solo Administradores pueden ejecutar simulaciones.")
 
-# --------------------------------------PESTAÑA 2: ANÁLISIS Y TENDENCIAS -----------------------------------------------------------
 
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                     PESTAÑA 2                               ║
+# ╚══════════════════════════════════════════════════════════════╝
 with tab2:
-    st.header("📈 Análisis histórico y tendencias")
-    
-    import os
-    import pandas as pd
-    import numpy as np
-    import plotly.express as px
-    
+    st.header("Análisis Histórico y Tendencias")
+
     archivo_local = "historial.csv"
-    
-    # Verificar existencia y no corrupción
+
     if not os.path.exists(archivo_local):
-        st.warning("No hay datos históricos. Ejecuta una simulación en la Pestaña 1.")
+        st.warning("Sin datos históricos. Ejecuta una simulación primero.")
         st.stop()
-    
+
     try:
         df_h = pd.read_csv(archivo_local)
     except Exception as e:
-        st.error(f"Error al leer archivo local: {e}")
+        st.error(f"Error al leer historial: {e}")
         if st.button("🗑️ Borrar archivo corrupto"):
             os.remove(archivo_local)
             st.rerun()
         st.stop()
-    
-    if df_h.empty:
-        st.warning("El archivo está vacío. Ejecuta una simulación.")
-        st.stop()
-    
-    # Procesar fechas
-    df_h['Fecha'] = pd.to_datetime(df_h['Fecha'], errors='coerce')
-    
-    for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-        if col in df_h.columns:
-            df_h[col] = pd.to_numeric(df_h[col], errors='coerce')
-    
-    df_h = df_h.dropna(subset=['Fecha']).sort_values('Fecha')
-    
-    # ==========================================================
-    # KPIs
-    # ==========================================================
-    
-    st.subheader("📌 Resumen global")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total simulaciones", len(df_h))
-    
-    with col2:
-        st.metric(
-            "Total ataques detectados",
-            f"{df_h['Ataques'].sum():,}"
-        )
-    
-    with col3:
-        avg_acc = df_h['Accuracy'].mean()
-        st.metric(
-            "Precisión promedio",
-            f"{avg_acc:.2%}"
-        )
-    
-    with col4:
-        puerto_top = df_h.loc[
-            df_h['Ataques'].idxmax(),
-            'Puerto'
-        ]
-        st.metric(
-            "Puerto más atacado",
-            puerto_top
-        )
-    
-    st.divider()
-    
-    # ==========================================================
-    # EVOLUCIÓN TEMPORAL
-    # ==========================================================
-    
-    st.subheader("📈 Evolución temporal de intrusiones")
-    
-    fig_line = px.line(
-        df_h,
-        x='Fecha',
-        y='Ataques',
-        markers=True,
-        title="Ataques detectados a lo largo del tiempo"
-    )
-    
-    fig_line.update_layout(
-        yaxis=dict(
-            title="Ataques",
-            gridcolor='lightgray'
-        ),
-        xaxis=dict(
-            title="Fecha",
-            tickformat="%b %Y",
-            tickangle=-45
-        ),
-        plot_bgcolor='white'
-    )
-    
-    st.plotly_chart(fig_line, use_container_width=True)
-    
-    st.divider()
-    
-    # ==========================================================
-    # TENDENCIA DE PUERTOS
-    # ==========================================================
-    
-    st.subheader("🔍 Tendencia de puertos atacados")
-    
-    puertos_counts = (
-        df_h['Puerto']
-        .value_counts()
-        .head(5)
-        .reset_index()
-    )
-    
-    puertos_counts.columns = [
-        'Puerto',
-        'Frecuencia'
-    ]
-    
-    fig_puertos = px.line(
-        puertos_counts,
-        x='Puerto',
-        y='Frecuencia',
-        markers=True,
-        title="Tendencia de los puertos más atacados"
-    )
-    
-    fig_puertos.update_layout(
-        xaxis_title="Puerto",
-        yaxis_title="Número de ataques",
-        plot_bgcolor='white'
-    )
-    
-    st.plotly_chart(fig_puertos, use_container_width=True)
-    
-    st.divider()
-    
-    # ==========================================================
-    # EVOLUCIÓN DE PUERTOS POR FECHA
-    # ==========================================================
-    
-    if len(df_h) >= 3:
-        
-        st.subheader("📊 Evolución de puertos por fecha")
-        
-        df_puertos_time = (
-            df_h
-            .groupby('Fecha')['Puerto']
-            .value_counts()
-            .reset_index(name='count')
-        )
-        
-        top_puertos = (
-            df_h['Puerto']
-            .value_counts()
-            .head(3)
-            .index
-            .tolist()
-        )
-        
-        df_puertos_time = df_puertos_time[
-            df_puertos_time['Puerto'].isin(top_puertos)
-        ]
-        
-        fig_puertos_time = px.line(
-            df_puertos_time,
-            x='Fecha',
-            y='count',
-            color='Puerto',
-            markers=True
-        )
-        
-        st.plotly_chart(
-            fig_puertos_time,
-            use_container_width=True
-        )
-    
-    st.divider()
-    
-    # ==========================================================
-    # MÉTRICAS GLOBALES INTERACTIVAS
-    # ==========================================================
-    
-    st.subheader("📊 Métricas globales del modelo")
 
-    acc_global = df_h['Accuracy'].mean()
-    prec_global = df_h['Precision'].mean()
-    rec_global = df_h['Recall'].mean()
-    f1_global = df_h['F1'].mean()
+    if df_h.empty:
+        st.warning("Historial vacío. Ejecuta una simulación.")
+        st.stop()
+
+    df_h["Fecha"] = pd.to_datetime(df_h["Fecha"], errors="coerce")
+    for col in ["Accuracy", "Precision", "Recall", "F1"]:
+        if col in df_h.columns:
+            df_h[col] = pd.to_numeric(df_h[col], errors="coerce")
+    df_h = df_h.dropna(subset=["Fecha"]).sort_values("Fecha")
+
+    # ── KPIs ──
+    st.subheader("Resumen global")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total simulaciones",      len(df_h))
+    k2.metric("Total ataques detectados", f"{df_h['Ataques'].sum():,}")
+    k3.metric("Accuracy promedio",        f"{df_h['Accuracy'].mean():.2%}")
+    k4.metric("Puerto más atacado",       df_h.loc[df_h["Ataques"].idxmax(), "Puerto"])
+
+    st.divider()
+
+    # ── Evolución temporal de intrusiones ──
+    st.subheader("Evolución temporal de intrusiones")
+    fig_line = go.Figure()
+    fig_line.add_trace(go.Scatter(
+        x=df_h["Fecha"], y=df_h["Ataques"],
+        mode="lines+markers",
+        line=dict(color=COLOR_ATAQUE, width=3),
+        marker=dict(size=9, color=COLOR_ATAQUE,
+                    line=dict(color="#080f1a", width=2)),
+        fill="tozeroy", fillcolor="rgba(255,79,94,.12)",
+        name="Ataques"
+    ))
+    fig_line.update_layout(**PLOTLY_LAYOUT, height=320,
+                           title="Ataques detectados a lo largo del tiempo",
+                           xaxis_title="Fecha", yaxis_title="Cantidad de ataques",
+                           xaxis=dict(tickformat="%d %b %Y", tickangle=-30,
+                                      gridcolor="#142035", tickfont=dict(color="#7ea8c8")))
+    st.plotly_chart(fig_line, use_container_width=True)
+
+    st.divider()
+
+    # ── Puertos más atacados — TREEMAP (más "perrón") ──
+    st.subheader("Distribución de puertos atacados")
+    puertos_df = (
+        df_h["Puerto"].value_counts().reset_index()
+    )
+    puertos_df.columns = ["Puerto", "Frecuencia"]
+    puertos_df["Puerto"] = puertos_df["Puerto"].astype(str)
+
+    fig_tree = go.Figure(go.Treemap(
+        labels=puertos_df["Puerto"],
+        parents=[""] * len(puertos_df),
+        values=puertos_df["Frecuencia"],
+        textinfo="label+value+percent root",
+        textfont=dict(size=14, color="#ffffff"),
+        marker=dict(
+            colorscale=[[0, "#0a2040"], [0.4, "#0060a0"], [1, COLOR_ATAQUE]],
+            colorbar=dict(tickfont=dict(color="#c8d8e8")),
+            line=dict(width=2, color="#080f1a"),
+        ),
+        hovertemplate="<b>%{label}</b><br>Frecuencia: %{value}<extra></extra>",
+    ))
+    fig_tree.update_layout(**PLOTLY_LAYOUT, height=380,
+                           title="Puertos más atacados (tamaño = frecuencia)")
+    st.plotly_chart(fig_tree, use_container_width=True)
+
+    st.divider()
+
+    # ── Métricas globales interactivas ──
+    st.subheader("Métricas globales del modelo")
+
+    acc_g  = df_h["Accuracy"].mean()
+    prec_g = df_h["Precision"].mean()
+    rec_g  = df_h["Recall"].mean()
+    f1_g   = df_h["F1"].mean()
 
     if "metrica_activa" not in st.session_state:
         st.session_state.metrica_activa = None
 
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Accuracy",  f"{acc_g:.2%}")
+        if st.button("Ver evolución", key="btn_acc"): st.session_state.metrica_activa = "Accuracy"
+    with m2:
+        st.metric("Precision", f"{prec_g:.2%}")
+        if st.button("Ver evolución", key="btn_prec"): st.session_state.metrica_activa = "Precision"
+    with m3:
+        st.metric("Recall",    f"{rec_g:.2%}")
+        if st.button("Ver evolución", key="btn_rec"): st.session_state.metrica_activa = "Recall"
+    with m4:
+        st.metric("F1-Score",  f"{f1_g:.2%}")
+        if st.button("Ver evolución", key="btn_f1"): st.session_state.metrica_activa = "F1"
 
-    with col_m1:
-        st.metric("Accuracy", f"{acc_global:.2%}")
-        if st.button("Ver", key="btn_acc"):
-            st.session_state.metrica_activa = "Accuracy"
-
-    with col_m2:
-        st.metric("Precision", f"{prec_global:.2%}")
-        if st.button("Ver", key="btn_prec"):
-            st.session_state.metrica_activa = "Precision"
-
-    with col_m3:
-        st.metric("Recall", f"{rec_global:.2%}")
-        if st.button("Ver", key="btn_rec"):
-            st.session_state.metrica_activa = "Recall"
-
-    with col_m4:
-        st.metric("F1-Score", f"{f1_global:.2%}")
-        if st.button("Ver", key="btn_f1"):
-            st.session_state.metrica_activa = "F1"
-
-    if st.session_state.metrica_activa is not None:
-
-        metrica = st.session_state.metrica_activa
-
-        fig_metric = px.line(
-            df_h,
-            x='Fecha',
-            y=metrica,
-            markers=True,
-            title=f"Evolución de {metrica}"
+    if st.session_state.metrica_activa:
+        met = st.session_state.metrica_activa
+        colors_map = {"Accuracy": COLOR_NORMAL, "Precision": COLOR_SUCCESS,
+                      "Recall": COLOR_WARN, "F1": COLOR_ATAQUE}
+        fig_ev = go.Figure()
+        fig_ev.add_trace(go.Scatter(
+            x=df_h["Fecha"], y=df_h[met],
+            mode="lines+markers",
+            line=dict(color=colors_map[met], width=3),
+            marker=dict(size=9, color=colors_map[met],
+                        line=dict(color="#080f1a", width=2)),
+            fill="tozeroy",
+            fillcolor=f"rgba({','.join(str(int(colors_map[met].lstrip('#')[i:i+2],16)) for i in (0,2,4))},.12)",
+        ))
+        fig_ev.update_layout(
+            **PLOTLY_LAYOUT, height=300,
+            title=f"Evolución de {met}",
+            yaxis=dict(tickformat=".0%", gridcolor="#142035",
+                       tickfont=dict(color="#7ea8c8")),
+            xaxis=dict(tickformat="%d %b %Y", tickangle=-30,
+                       gridcolor="#142035", tickfont=dict(color="#7ea8c8")),
         )
-
-        fig_metric.update_layout(
-            yaxis=dict(
-                title=metrica,
-                tickformat=".0%",
-                gridcolor='lightgray'
-            ),
-            xaxis=dict(
-                title="Fecha",
-                tickformat="%b %Y",
-                tickangle=-45
-            ),
-            plot_bgcolor='white'
-        )
-
-        st.plotly_chart(
-            fig_metric,
-            use_container_width=True
-        )
+        st.plotly_chart(fig_ev, use_container_width=True)
 
     st.divider()
-    
-    # ==========================================================
-    # TABLA FINAL
-    # ==========================================================
-    
-    st.subheader("📋 Registro detallado de todas las simulaciones")
-    
-    columnas = [
-        'Fecha',
-        'Hora',
-        'Dataset',
-        'Total',
-        'Normales',
-        'Ataques',
-        'Accuracy',
-        'Precision',
-        'Recall',
-        'F1',
-        'Puerto',
-        'Tiempo (s)'
-    ]
-    
+
+    # ── MATRIZ DE CONFUSIÓN ACUMULADA ──
+    st.subheader("Matriz de Confusión acumulada (todas las simulaciones)")
+
+    cols_cm = ["TN", "FP", "FN", "TP"]
+    if all(c in df_h.columns for c in cols_cm):
+        tn = int(df_h["TN"].sum())
+        fp = int(df_h["FP"].sum())
+        fn = int(df_h["FN"].sum())
+        tp = int(df_h["TP"].sum())
+    else:
+        # Estimación a partir de métricas si no hay columnas individuales
+        total_s   = df_h["Total"].sum() if "Total" in df_h.columns else 1000
+        ataques_s = df_h["Ataques"].sum() if "Ataques" in df_h.columns else 100
+        normales_s = total_s - ataques_s
+        tp = int(ataques_s * rec_g)
+        fn = int(ataques_s - tp)
+        fp = int(tp / max(prec_g, 0.0001) - tp)
+        tn = int(normales_s - fp)
+
+    cm_vals = [[tn, fp], [fn, tp]]
+    fig_cm_hist = go.Figure(go.Heatmap(
+        z=cm_vals,
+        x=["Pred: Normal", "Pred: Ataque"],
+        y=["Real: Normal", "Real: Ataque"],
+        colorscale=[[0, "#0a1f38"], [0.5, "#0060a0"], [1, COLOR_ATAQUE]],
+        text=[[f"{tn:,}", f"{fp:,}"], [f"{fn:,}", f"{tp:,}"]],
+        texttemplate="<b>%{text}</b>",
+        textfont=dict(size=20, color="#ffffff"),
+        showscale=True,
+        colorbar=dict(tickfont=dict(color="#c8d8e8")),
+    ))
+    fig_cm_hist.update_layout(
+        **PLOTLY_LAYOUT, height=360,
+        title="Matriz de Confusión acumulada — Normal vs Ataque",
+        xaxis=dict(title="Predicción", tickfont=dict(size=13, color="#7ea8c8")),
+        yaxis=dict(title="Valor Real", tickfont=dict(size=13, color="#7ea8c8")),
+    )
+    st.plotly_chart(fig_cm_hist, use_container_width=True)
+
+    # Métricas derivadas de la CM
+    if (tp + fn) > 0 and (tp + fp) > 0:
+        recall_calc = tp / (tp + fn)
+        prec_calc   = tp / (tp + fp)
+        st.markdown(f"""
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
+          <div style="background:#0a1f38;border:1px solid #1a4a7a;border-radius:8px;padding:10px 18px;">
+            <div style="font-size:11px;color:#7ea8c8;font-family:'Space Mono',monospace;text-transform:uppercase;">Verdaderos Negativos</div>
+            <div style="font-size:22px;color:#00c8ff;font-weight:600;">{tn:,}</div>
+          </div>
+          <div style="background:#0a1f38;border:1px solid #1a4a7a;border-radius:8px;padding:10px 18px;">
+            <div style="font-size:11px;color:#7ea8c8;font-family:'Space Mono',monospace;text-transform:uppercase;">Falsos Positivos</div>
+            <div style="font-size:22px;color:#ffaa00;font-weight:600;">{fp:,}</div>
+          </div>
+          <div style="background:#0a1f38;border:1px solid #1a4a7a;border-radius:8px;padding:10px 18px;">
+            <div style="font-size:11px;color:#7ea8c8;font-family:'Space Mono',monospace;text-transform:uppercase;">Falsos Negativos</div>
+            <div style="font-size:22px;color:#ff4f5e;font-weight:600;">{fn:,}</div>
+          </div>
+          <div style="background:#0a1f38;border:1px solid #1a4a7a;border-radius:8px;padding:10px 18px;">
+            <div style="font-size:11px;color:#7ea8c8;font-family:'Space Mono',monospace;text-transform:uppercase;">Verdaderos Positivos</div>
+            <div style="font-size:22px;color:#00c853;font-weight:600;">{tp:,}</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── Tabla detallada ──
+    st.subheader("Registro detallado de simulaciones")
+    columnas = ["Fecha", "Hora", "Dataset", "Total", "Normales", "Ataques",
+                "Accuracy", "Precision", "Recall", "F1", "Puerto", "Tiempo (s)"]
     for col in columnas:
         if col not in df_h.columns:
             df_h[col] = np.nan
-    
-    df_display = df_h.copy()
-    
-    df_display['Fecha'] = df_display['Fecha'].dt.date
-    
-    for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-        if col in df_display.columns:
-            df_display[col] = df_display[col].apply(
-                lambda x: f"{x:.2%}"
-            )
-    
-    st.dataframe(
-        df_display[columnas],
-        use_container_width=True,
-        height=400
-    )
-# =====================================================================
-# PESTAÑA 3: MOVIMIENTOS (cada simulación) Y REPORTES DESCARGABLES
-# =====================================================================
+    df_disp = df_h.copy()
+    df_disp["Fecha"] = df_disp["Fecha"].dt.date
+    for col in ["Accuracy", "Precision", "Recall", "F1"]:
+        if col in df_disp.columns:
+            df_disp[col] = df_disp[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "—")
+    st.dataframe(df_disp[columnas], use_container_width=True, height=400, hide_index=True)
+
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║                     PESTAÑA 3                               ║
+# ╚══════════════════════════════════════════════════════════════╝
 with tab3:
-    st.header("📋 Movimientos y reportes personalizados")
-    df_h = logic.obtener_metricas_resumen("historial.csv")
-    
-    if df_h is not None and not df_h.empty:
-        # --- Mostrar cada simulación como un "movimiento" (tabla completa) ---
-        st.subheader("📌 Listado de movimientos (cada simulación)")
-        columnas_mov = ['Fecha', 'Hora', 'Dataset', 'Total', 'Normales', 'Ataques',
-                        'Accuracy', 'Precision', 'Recall', 'F1', 'Puerto', 'Tiempo (s)']
-        # Filtrar solo columnas existentes
-        col_existentes = [col for col in columnas_mov if col in df_h.columns]
-        df_mov = df_h[col_existentes].copy()
-        # Formatear porcentajes
-        for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-            if col in df_mov.columns:
-                df_mov[col] = df_mov[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-        st.dataframe(df_mov, use_container_width=True, height=350)
-        
-        st.divider()
-        
-        # --- Gráfico de barras: ataques por fecha (movimientos) ---
-        st.subheader("📊 Ataques por fecha de simulación")
-        fig_mov = px.bar(df_h, x='Fecha', y='Ataques', title='Cantidad de ataques detectados por fecha',
-                         color='Ataques', color_continuous_scale='Reds')
-        st.plotly_chart(fig_mov, use_container_width=True)
-        
-        st.divider()
-        
-        # --- Reportes descargables por rango de fechas ---
-        st.subheader("📥 Reporte por rango de fechas")
-        min_fecha = df_h['Fecha'].min().date()
-        max_fecha = df_h['Fecha'].max().date()
-        
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            fecha_ini = st.date_input("Desde", value=min_fecha, min_value=min_fecha, max_value=max_fecha, key="rep_ini")
-        with col_f2:
-            fecha_fin = st.date_input("Hasta", value=max_fecha, min_value=min_fecha, max_value=max_fecha, key="rep_fin")
-        
-        mask = (df_h['Fecha'].dt.date >= fecha_ini) & (df_h['Fecha'].dt.date <= fecha_fin)
-        df_filtrado = df_h.loc[mask].copy()
-        
-        if df_filtrado.empty:
-            st.warning("⚠️ No hay registros en ese rango.")
-        else:
-            st.success(f"✅ {len(df_filtrado)} registros encontrados entre {fecha_ini} y {fecha_fin}.")
-            # Mostrar tabla filtrada
-            st.write("**Vista previa del reporte**")
-            df_prev = df_filtrado[col_existentes].copy()
-            for col in ['Accuracy', 'Precision', 'Recall', 'F1']:
-                if col in df_prev.columns:
-                    df_prev[col] = df_prev[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/A")
-            st.dataframe(df_prev, use_container_width=True)
-            
-            # Gráfico del reporte
-            fig_rep = px.bar(df_filtrado, x='Fecha', y='Ataques', title='Ataques en el periodo seleccionado',
-                             color='Ataques', color_continuous_scale='Reds')
-            st.plotly_chart(fig_rep, use_container_width=True)
-            
-            # Botón de descarga
-            csv_buffer = io.StringIO()
-            df_filtrado.to_csv(csv_buffer, index=False)
-            st.download_button(
-                label="📎 Descargar reporte (CSV)",
-                data=csv_buffer.getvalue(),
-                file_name=f"reporte_{fecha_ini}_{fecha_fin}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        
-        st.divider()
-        
-        # --- Reporte completo (todo el historial) ---
-        st.subheader("📥 Exportar historial completo")
-        csv_total = io.StringIO()
-        df_h.to_csv(csv_total, index=False)
-        st.download_button(
-            label="📎 Descargar todas las simulaciones",
-            data=csv_total.getvalue(),
-            file_name="historial_completo.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-        
-        # --- Botón para borrar historial (con precaución) ---
-        if st.button("⚠️ Borrar todo el historial", type="secondary"):
+    st.header("Movimientos y Reportes")
+    df_h3 = logic.obtener_metricas_resumen("historial.csv")
+
+    if df_h3 is None or df_h3.empty:
+        st.info("💡 Sin datos históricos. Realiza una simulación primero.")
+        st.stop()
+
+    # ── Tarjetas resumen ──
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0a1f38,#0d2d52);border:1px solid #1a4a7a;border-radius:10px;padding:14px 20px;margin-bottom:1.2rem;">
+      <span style="font-family:'Space Mono',monospace;color:#7ea8c8;font-size:12px;text-transform:uppercase;letter-spacing:.08em;">Resumen del historial completo</span>
+    </div>
+    """, unsafe_allow_html=True)
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("Simulaciones totales",    len(df_h3))
+    s2.metric("Registros analizados",    f"{df_h3['Total'].sum():,}" if "Total" in df_h3 else "—")
+    s3.metric("Total ataques detectados", f"{df_h3['Ataques'].sum():,}" if "Ataques" in df_h3 else "—")
+    s4.metric("F1 promedio",             f"{df_h3['F1'].mean():.2%}" if "F1" in df_h3 else "—")
+
+    st.divider()
+
+    # ── Listado de movimientos ──
+    st.subheader("Listado de movimientos")
+    columnas_mov = ["Fecha", "Hora", "Dataset", "Total", "Normales", "Ataques",
+                    "Accuracy", "Precision", "Recall", "F1", "Puerto", "Tiempo (s)"]
+    col_exist = [c for c in columnas_mov if c in df_h3.columns]
+    df_mov = df_h3[col_exist].copy()
+    for col in ["Accuracy", "Precision", "Recall", "F1"]:
+        if col in df_mov.columns:
+            df_mov[col] = df_mov[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "—")
+    st.dataframe(df_mov, use_container_width=True, height=350, hide_index=True)
+
+    st.divider()
+
+    # ── Descarga por rango de fechas ──
+    st.subheader("Reporte por rango de fechas")
+    min_f = df_h3["Fecha"].min().date()
+    max_f = df_h3["Fecha"].max().date()
+
+    fa, fb = st.columns(2)
+    with fa: f_ini = st.date_input("Desde", value=min_f, min_value=min_f, max_value=max_f, key="rep_ini")
+    with fb: f_fin = st.date_input("Hasta", value=max_f, min_value=min_f, max_value=max_f, key="rep_fin")
+
+    mask = (df_h3["Fecha"].dt.date >= f_ini) & (df_h3["Fecha"].dt.date <= f_fin)
+    df_filt = df_h3.loc[mask].copy()
+
+    if df_filt.empty:
+        st.warning("Sin registros en ese rango de fechas.")
+    else:
+        st.success(f"✅ {len(df_filt)} registros entre {f_ini} y {f_fin}")
+        df_prev = df_filt[col_exist].copy()
+        for col in ["Accuracy", "Precision", "Recall", "F1"]:
+            if col in df_prev.columns:
+                df_prev[col] = df_prev[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "—")
+        st.dataframe(df_prev, use_container_width=True, hide_index=True)
+
+        buf = io.StringIO()
+        df_filt.to_csv(buf, index=False)
+        st.download_button("📎 Descargar reporte CSV",
+                           data=buf.getvalue(),
+                           file_name=f"reporte_{f_ini}_{f_fin}.csv",
+                           mime="text/csv",
+                           use_container_width=True)
+
+    st.divider()
+
+    # ── Exportar todo ──
+    st.subheader("Exportar historial completo")
+    buf_all = io.StringIO()
+    df_h3.to_csv(buf_all, index=False)
+    st.download_button("📎 Descargar todas las simulaciones",
+                       data=buf_all.getvalue(),
+                       file_name="historial_completo.csv",
+                       mime="text/csv",
+                       use_container_width=True)
+
+    st.divider()
+
+    # ── Zona peligrosa ──
+    with st.expander("⚠️ Zona peligrosa"):
+        if st.button("Borrar todo el historial", type="secondary"):
             if os.path.exists("historial.csv"):
                 os.remove("historial.csv")
-                st.success("Historial eliminado. Recarga la página.")
+                st.success("Historial eliminado.")
                 st.rerun()
-    else:
-        st.info("💡 No hay datos históricos. Realiza una simulación primero.")
