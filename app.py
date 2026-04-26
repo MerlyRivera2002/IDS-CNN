@@ -209,16 +209,7 @@ hr { border-color: #1a3a5c !important; }
 # ═══════════════════════════════════════════════════════════════
 # PALETA PLOTLY — TEMA OSCURO COHERENTE
 # ═══════════════════════════════════════════════════════════════
-PLOTLY_LAYOUT = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#080f1a",
-    font=dict(family="DM Sans", color="#c8d8e8", size=13),
-    margin=dict(t=40, b=30, l=10, r=10),
-    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#c8d8e8")),
-    xaxis=dict(gridcolor="#142035", linecolor="#1a3a5c", tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8")),
-    yaxis=dict(gridcolor="#142035", linecolor="#1a3a5c", tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8")),
-    title_font=dict(family="Space Mono", color="#e0eaf5", size=14),
-)
+
 COLOR_ATAQUE  = "#ff4f5e"
 COLOR_NORMAL  = "#00c8ff"
 COLOR_ACCENT  = "#7ec8f7"
@@ -227,22 +218,34 @@ COLOR_SUCCESS = "#00c853"
 
 def apply_theme(fig, height=320, title="", xaxis_title="", yaxis_title="",
                 xaxis_extra=None, yaxis_extra=None, no_axes=False, **kwargs):
-    base = dict(PLOTLY_LAYOUT)
-    base.pop("xaxis", None)
-    base.pop("yaxis", None)
-    layout = dict(**base, height=height, title=title, **kwargs)
+    # Apply base theme first — no dict merging, no conflicts
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#080f1a",
+        font=dict(family="DM Sans", color="#c8d8e8", size=13),
+        margin=dict(t=40, b=30, l=10, r=10),
+        title_font=dict(family="Space Mono", color="#e0eaf5", size=14),
+        height=height,
+        title=title,
+    )
+    # Apply legend separately to allow callers to override it
+    if "legend" not in kwargs:
+        fig.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#c8d8e8")))
+    # Apply any extra caller kwargs last (they win over base)
+    if kwargs:
+        fig.update_layout(**kwargs)
+    # Axes only for chart types that support them
     if not no_axes:
-        x = dict(gridcolor="#142035", linecolor="#1a3a5c",
-                 tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8"))
-        y = dict(gridcolor="#142035", linecolor="#1a3a5c",
-                 tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8"))
+        ax = dict(gridcolor="#142035", linecolor="#1a3a5c",
+                  tickcolor="#1a3a5c", tickfont=dict(color="#7ea8c8"))
+        x = dict(ax)
+        y = dict(ax)
         if xaxis_extra:  x.update(xaxis_extra)
         if yaxis_extra:  y.update(yaxis_extra)
         if xaxis_title:  x["title"] = xaxis_title
         if yaxis_title:  y["title"] = yaxis_title
-        layout["xaxis"] = x
-        layout["yaxis"] = y
-    fig.update_layout(**layout)
+        fig.update_xaxes(**x)
+        fig.update_yaxes(**y)
     return fig
 
 
