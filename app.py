@@ -321,12 +321,16 @@ with tab1:
     if st.session_state.perfil == "Administrador":
         st.header("Monitor de Tráfico en Tiempo Real")
 
-        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([3, 1.5, 1])
+        # Ajustamos columnas: 3 para archivo, 1.5 para velocidad, 1.5 para umbral, 1 para botón limpiar
+        col_ctrl1, col_ctrl2, col_ctrl3, col_ctrl4 = st.columns([3, 1.5, 1.5, 1])
         with col_ctrl1:
             archivo = st.file_uploader("Subir dataset CSV", type=["csv"], key="uploader_sim")
         with col_ctrl2:
             velocidad = st.slider("Seg / lote", 0.02, 0.5, 0.08, 0.02)
         with col_ctrl3:
+            umbral = st.slider("Umbral (sensibilidad)", 0.01, 0.99, 0.35, 0.01,
+                               help="Valor bajo → detecta más ataques (más falsos positivos). Alto → más preciso, pero puede perder ataques.")
+        with col_ctrl4:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🔄 Limpiar", use_container_width=True):
                 st.session_state.pop("simulacion_activa", None)
@@ -367,8 +371,9 @@ with tab1:
                         X_chunk = scaler.transform(
                             chunk[features_list]
                         ).reshape(-1, len(features_list), 1)
+                        # Usar el umbral seleccionado en lugar del fijo 0.35
                         chunk_preds = (
-                            model.predict(X_chunk, verbose=0) > 0.35
+                            model.predict(X_chunk, verbose=0) > umbral
                         ).astype(int).flatten()
                         preds_totales.extend(chunk_preds)
 
@@ -463,7 +468,6 @@ with tab1:
                                 if p == 21: return "Acceso FTP no autorizado"
                                 return "Escaneo / puerto sospechoso"
                             vista["Diagnóstico"] = vista.apply(diagnose, axis=1)
-                            # Tabla con scroll completo
                             st.dataframe(
                                 vista,
                                 use_container_width=True,
@@ -497,7 +501,6 @@ with tab1:
                         rec  = recall_score(y_true,    preds_totales, zero_division=0)
                         f1   = f1_score(y_true,        preds_totales, zero_division=0)
 
-                        # Gráfico métricas
                         st.subheader("Evaluación del modelo CNN")
                         df_met = pd.DataFrame({
                             "Métrica": ["Accuracy", "Precision", "Recall", "F1-Score"],
@@ -523,7 +526,6 @@ with tab1:
                                     bargap=0.35)
                         st.plotly_chart(fig_met, use_container_width=True)
 
-                        # Matriz de confusión
                         st.subheader("Matriz de Confusión")
                         cm = confusion_matrix(y_true, preds_totales)
                         fig_cm = go.Figure(go.Heatmap(
@@ -559,8 +561,6 @@ with tab1:
                     st.toast("Simulación guardada en bitácora ✔")
     else:
         st.warning("🔒 Solo Administradores pueden ejecutar simulaciones.")
-
-
 # ╔══════════════════════════════════════════════════════════════╗
 # ║                     PESTAÑA 2                               ║
 # ╚══════════════════════════════════════════════════════════════╝
